@@ -1,0 +1,4 @@
+
+https://pypi.org/project/python-whatsapp-bot/
+
+https://github.com/daveebbelaar/python-whatsapp-bot
