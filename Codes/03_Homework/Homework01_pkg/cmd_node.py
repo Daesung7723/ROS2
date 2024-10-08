@@ -1,4 +1,4 @@
-import random
+# import random
 import rclpy as rp
 from rclpy.node import Node
 from hmwk01_msg.msg import HmWk01
@@ -11,7 +11,7 @@ class Cmd(Node):
         self.pub = self.create_publisher(HmWk01, '/HmWk01', 10)
 
     def run(self):
-        self.msg.cmd = input('chosse cmd '+ str(self.cmd_list) +'= ')
+        self.msg.cmd = input('choose cmd '+ str(self.cmd_list) +'= ')
         
         try :
             if self.msg.cmd == 'set':
