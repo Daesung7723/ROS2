@@ -1,0 +1,14 @@
+# Request
+float32 p_x
+float32 p_y
+float32 x_l
+float32 y_l
+
+---
+# Result
+bool rslt
+
+---
+# Feedback
+float32 pose_x
+float32 pose_y
