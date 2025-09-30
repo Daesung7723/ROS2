@@ -5,6 +5,7 @@ import random
 import math
 import subprocess
 import sys
+import os
 
 # 사용할 메시지 및 서비스 타입
 from turtlesim.srv import Spawn, Kill, SetPen, TeleportAbsolute
@@ -18,6 +19,9 @@ class TurtleManagerNode(Node):
     def __init__(self):
         super().__init__('turtle_manager_node')
         self.get_logger().info("Turtle Manager Node가 시작되었습니다.")
+
+        # 스크립트의 절대 경로를 기준으로 driver node 경로를 설정합니다.
+        self.driver_script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'turtle_driver_node.py')
 
         # 자율 주행 노드 프로세스를 관리하는 딕셔너리
         self.drivers = {}  # { "turtle_name": subprocess.Popen_instance }
@@ -61,7 +65,7 @@ class TurtleManagerNode(Node):
             self.get_logger().info(f"성공: '{new_name}' 생성. 자율 주행 노드를 시작합니다.")
             if new_name not in self.drivers:
                 # 새 거북이를 위한 드라이버 노드를 별도 프로세스로 실행
-                driver_process = subprocess.Popen([sys.executable, 'turtle_driver_node.py', new_name])
+                driver_process = subprocess.Popen([sys.executable, self.driver_script_path, new_name])
                 self.drivers[new_name] = driver_process
         except Exception as e:
             self.get_logger().error(f"spawn 서비스 호출 실패: {e}")
@@ -163,7 +167,7 @@ class TurtleManagerNode(Node):
         for turtle_name in self.get_turtle_list():
             if turtle_name and turtle_name not in self.drivers:
                 self.get_logger().info(f"'{turtle_name}' 발견. 자율 주행 노드를 시작합니다.")
-                driver_process = subprocess.Popen([sys.executable, 'turtle_driver_node.py', turtle_name])
+                driver_process = subprocess.Popen([sys.executable, self.driver_script_path, turtle_name])
                 self.drivers[turtle_name] = driver_process
 
     def get_turtle_list(self):
@@ -204,7 +208,7 @@ def main(args=None):
     for turtle_name in manager_node.get_turtle_list():
         if turtle_name not in manager_node.drivers:
             manager_node.get_logger().info(f"'{turtle_name}' 발견. 자율 주행 노드를 시작합니다.")
-            driver_process = subprocess.Popen([sys.executable, 'turtle_driver_node.py', turtle_name])
+            driver_process = subprocess.Popen([sys.executable, manager_node.driver_script_path, turtle_name])
             manager_node.drivers[turtle_name] = driver_process
 
     # 여러 스레드를 사용하여 콜백들이 서로를 막지 않도록 함
