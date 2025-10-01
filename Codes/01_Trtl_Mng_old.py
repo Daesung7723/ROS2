@@ -11,8 +11,8 @@ from std_srvs.srv import Empty
 
 class TurtleManagerNode(Node):
     """
-    사용자 입력을 받아 turtlesim을 제어하는 관리자 노드.
-    (자율 주행 노드 실행/관리는 launch 파일과 ROS 시스템이 담당)
+    사용자 입력을 받아 turtlesim을 제어하고,
+    각 거북이의 자율 주행 노드를 직접 실행/관리하는 노드.
     """
     def __init__(self):
         super().__init__('turtle_manager_node')
@@ -23,6 +23,12 @@ class TurtleManagerNode(Node):
         self.kill_client = self.create_client(Kill, 'kill')
         self.clear_client = self.create_client(Empty, 'clear')
         self.reset_client = self.create_client(Empty, 'reset')
+
+        # 노드 시작 시 이미 존재하는 거북이들의 드라이버를 실행하기 위해
+        # 1초 후에 한 번만 실행되는 타이머를 생성합니다.
+        # (노드가 네트워크의 다른 노드들을 발견할 시간을 주기 위함)
+        self.create_timer(1.0, self.start_existing_turtle_drivers)
+
 
     def user_spawn(self):
         """사용자 입력으로 새 거북이를 생성 (비동기)"""
@@ -54,20 +60,10 @@ class TurtleManagerNode(Node):
         try:
             result = future.result()
             new_name = result.name
-            self.get_logger().info(f"성공: '{new_name}' 생성. 자율 주행 노드를 시작합니다.")
-            
-            # 현재 스크립트의 디렉토리 경로를 찾습니다.
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            # 실행할 드라이버 노드 스크립트의 전체 경로를 구성합니다.
-            driver_script_path = os.path.join(current_dir, 'turtle_driver_node.py')
-
-            # python3 인터프리터를 사용하여 turtle_driver_node.py를 새 프로세스로 실행합니다.
-            # 예: python3 /path/to/turtle_driver_node.py turtle2
-            subprocess.Popen([sys.executable, driver_script_path, new_name])
-
+            self._start_driver_for_turtle(new_name)
         except Exception as e:
-            self.get_logger().error(f"spawn 서비스 호출 실패: {e}")
-
+            # future.result()에서 예외가 발생할 수 있습니다 (예: 이름 중복)
+            self.get_logger().error(f"spawn 서비스 처리 중 오류 발생: {e}")
 
     def user_kill(self):
         """사용자 입력으로 특정 거북이를 제거"""
@@ -153,6 +149,25 @@ class TurtleManagerNode(Node):
                 if turtle_name:
                     turtle_names.append(turtle_name)
         return turtle_names
+    
+    def _start_driver_for_turtle(self, turtle_name):
+        """지정된 거북이의 자율 주행 노드를 시작합니다."""
+        self.get_logger().info(f"'{turtle_name}'의 자율 주행 노드를 시작합니다.")
+
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        driver_script_path = os.path.join(current_dir, 'turtle_driver_node.py')
+
+        # 드라이버 노드를 새 프로세스로 실행합니다.
+        subprocess.Popen([sys.executable, driver_script_path, turtle_name])
+
+    def start_existing_turtle_drivers(self):
+        """현재 존재하는 모든 거북이의 드라이버 노드를 시작합니다."""
+        self.get_logger().info("기존 거북이들의 자율 주행을 시작합니다...")
+        existing_turtles = self.get_turtle_list()
+        for turtle_name in existing_turtles:
+            self._start_driver_for_turtle(turtle_name)
+        # 이 함수는 한 번만 실행되면 되므로 타이머를 취소합니다.
+        self.destroy_timer(self.timers[0])
 
 
 def print_menu():
