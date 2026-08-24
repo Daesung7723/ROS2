@@ -89,11 +89,11 @@
 | 구분 | ROS 1 | ROS 2 |
 |------|------|------|
 | 설계 전제 | 연구실 환경 | 산업·상용 환경 |
-| 통신 계층 | 자체 개발 TCPROS · 마스터 구조 | **DDS** 기반 (OMG 표준) |
+| 통신 계층 | 자체 개발 TCPROS — TCP(Transmission Control Protocol) 기반 · 마스터 구조 | **DDS** 기반 · OMG(Object Management Group — 국제 표준화 단체) 표준 |
 | 강화 요소 | — | 실시간성·보안·다중 로봇 |
 | 현재 위상 | 지원 종료 (Noetic, 2025-05) | 신규 개발 표준 |
 
-- 이 과정의 사용 판 = **Jazzy Jalisco** (2024-05 · LTS 2029년까지 지원 · **Ubuntu 24.04 대응**)
+- 이 과정의 사용 판 = **Jazzy Jalisco** — 2024-05 출시 · LTS(Long Term Support — 장기 지원판)로 2029년까지 지원 · **Ubuntu 24.04 대응**
 - ROS2 LTS는 Ubuntu LTS와 연동해 출시됩니다 — Foxy↔20.04 · Humble↔22.04 · Jazzy↔24.04
 - 릴리스 목록·지원 기간: https://docs.ros.org/en/rolling/Releases.html
 
@@ -162,19 +162,19 @@ geometry_msgs/msg/Twist
 | 느슨한 결합 | 발행자·구독자가 서로를 알지 못해도 동작 — **시뮬레이션에서 실물로 옮길 수 있는 근거** |
 | 언어 독립 | 메시지 형식만 일치하면 Python·C++ 노드 혼용 가능 |
 | 분산 처리 | 여러 기기에 노드를 나누어 배치 — 네트워크 너머 노드와도 동일 방식 통신 |
-| 관찰·기록 용이 | 흐르는 메시지를 CLI로 관찰(`echo`)·기록/재생(bag) |
+| 관찰·기록 용이 | 흐르는 메시지를 CLI(Command Line Interface)로 관찰(`echo`)·기록/재생(bag) |
 | 부분 장애 격리 | 한 노드가 정지해도 전체가 정지하지 않음 |
 
 | 한계 | 보완 |
 |------|------|
-| 통신 오버헤드 — 고속 제어 루프에 불리 | 프로세스 내 통신(IPC) |
-| 실시간성 보장 곤란 — 도착 시점이 비결정적 | DDS·QoS 설정 |
+| 통신 오버헤드 — 고속 제어 루프에 불리 | IPC(Intra-Process Communication — 프로세스 내 통신) |
+| 실시간성 보장 곤란 — 도착 시점이 비결정적 | DDS·QoS(Quality of Service — 통신 품질) 설정 |
 | 실행 흐름 추적 복잡 | rqt_graph·로그·bag |
 
 ### 2.5 DDS와 Domain ID
 
 - **DDS**(Data Distribution Service) — OMG 표준 출판/구독 통신 미들웨어. ROS2의 모든 토픽 통신이 이 위에서 동작하며, 마스터 없이 노드가 서로를 자동 발견합니다
-- 전송 방식 = **UDP/IP 기반의 신뢰성 있는 멀티캐스트**. 같은 도메인의 토픽들이 **DDS Global Space**라는 공통 공간에 놓입니다
+- 전송 방식 = **UDP(User Datagram Protocol)/IP 기반의 신뢰성 있는 멀티캐스트**. 같은 도메인의 토픽들이 **DDS Global Space**라는 공통 공간에 놓입니다
 - **`ROS_DOMAIN_ID`** = 이 Global Space를 번호로 분리하는 설정. 같은 번호끼리만 통신합니다
 
 > **자주 하는 실수 —** 강의실 여러 대가 같은 네트워크를 사용합니다. Domain ID를 설정하지 않으면 다른 사람의 turtle이 함께 움직이는 혼선이 발생합니다. 반드시 각자 번호를 설정하세요.
@@ -184,10 +184,10 @@ geometry_msgs/msg/Twist
 | 도구 | 역할 | 이 과정에서 |
 |------|------|------|
 | CLI | 명령어로 노드·토픽 관찰·제어 | 오늘부터 매일 사용 |
-| rqt 계열 | GUI 도구 모음 — rqt_graph·rqt_plot·rqt_bag | rqt_graph 오늘 사용 |
+| rqt 계열 | GUI(Graphical User Interface) 도구 모음 — rqt_graph·rqt_plot·rqt_bag | rqt_graph 오늘 사용 |
 | RViz | 3D 시각화 — 센서 데이터·로봇 모델 표시 | Day 7 실습 |
 | Gazebo | 물리엔진 3D 시뮬레이터 | Day 7 실습 |
-| SLAM·Nav2 | 지도 작성·위치 추정 / 자율 내비게이션 | Day 7 실습 |
+| SLAM(Simultaneous Localization and Mapping) · Nav2 | 지도 작성 + 위치 추정 / 자율 내비게이션 | Day 7 실습 |
 
 ---
 
@@ -411,7 +411,7 @@ ros2 run turtlesim turtle_teleop_key
 
 - `ros2 run <패키지> <노드>` — 패키지에 등록된 노드 하나를 실행하는 명령
 - 화살표 키로 turtle 이동을 확인합니다
-- 동작 구조 — teleop 노드가 키 입력을 속도 메시지로 변환해 `/turtle1/cmd_vel`에 발행 → turtlesim 노드가 구독해 turtle 이동
+- 동작 구조 — teleop(teleoperation — 원격 조작) 노드가 키 입력을 속도 메시지로 변환해 `/turtle1/cmd_vel`에 발행 → turtlesim 노드가 구독해 turtle 이동
 
 ### 6.2 노드 관찰
 
