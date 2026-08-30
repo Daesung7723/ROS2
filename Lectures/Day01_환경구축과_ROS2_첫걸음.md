@@ -162,7 +162,7 @@ geometry_msgs/msg/Twist
 | 느슨한 결합 | 발행자·구독자가 서로를 알지 못해도 동작 — **시뮬레이션에서 실물로 옮길 수 있는 근거** |
 | 언어 독립 | 메시지 형식만 일치하면 Python·C++ 노드 혼용 가능 |
 | 분산 처리 | 여러 기기에 노드를 나누어 배치 — 네트워크 너머 노드와도 동일 방식 통신 |
-| 관찰·기록 용이 | 흐르는 메시지를 CLI(Command Line Interface)로 관찰(`echo`)·기록/재생(bag) |
+| 관찰·기록 용이 | 발행되는 메시지를 CLI(Command Line Interface)로 관찰(`echo`)·기록/재생(bag) |
 | 부분 장애 격리 | 한 노드가 정지해도 전체가 정지하지 않음 |
 
 | 한계 | 보완 |
@@ -480,13 +480,13 @@ ros2 node info /turtlesim   # 노드가 가진 토픽·서비스·액션 목록
 
 ```bash
 ros2 topic list -t                  # 토픽 목록 조회 (-t = 메시지 타입 병기)
-ros2 topic echo /turtle1/cmd_vel    # 토픽에 흐르는 메시지 실시간 관찰
+ros2 topic echo /turtle1/cmd_vel    # 토픽에 발행되는 메시지 실시간 관찰
 ros2 topic info /turtle1/cmd_vel    # 토픽 정보 — 타입·발행/구독 수
 ros2 interface show geometry_msgs/msg/Twist    # 타입의 내부 구조 출력
 ros2 interface show turtlesim/msg/Pose         # 위치 메시지 구조
 ```
 
-토픽의 **흐름 상태**를 측정하는 두 명령 — 값이 아니라 통신 자체를 관찰합니다:
+토픽의 **전송 상태**를 측정하는 두 명령 — 값이 아니라 통신 자체를 관찰합니다:
 
 ```bash
 ros2 topic hz /turtle1/pose      # 발행 주기 측정 (Hz — 초당 발행 횟수)
