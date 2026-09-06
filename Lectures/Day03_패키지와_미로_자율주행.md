@@ -152,6 +152,30 @@ src에 코드 작성·수정 ──▶ colcon build ──▶ source install/loc
 
 ## 3. 실습 ① — 워크스페이스·패키지 만들기
 
+### 3.0 빌드 도구 확인 — colcon
+
+Day 1에서 설치한 `ros-jazzy-desktop`에는 **빌드 도구 colcon이 포함되지 않습니다.** Day 1·2는 빌드가 없었으므로 오늘이 첫 사용입니다 — 실습에 들어가기 전에 확인합니다.
+
+```bash
+which colcon                 # 경로가 출력되면 설치된 상태
+```
+
+출력이 없으면 설치합니다.
+
+```bash
+sudo apt update
+sudo apt install python3-colcon-common-extensions ros-dev-tools
+```
+
+| 패키지 | 역할 |
+|------|------|
+| `python3-colcon-common-extensions` | `colcon build`·`colcon test` 등 빌드 명령 확장 |
+| `ros-dev-tools` | 개발 도구 묶음 — `rosdep`(의존 패키지 설치)·`vcstool` 등 |
+
+- 설치는 **최초 1회**입니다. Raspberry Pi 5에서도 같은 확인이 필요합니다(11. 다음 시간 준비)
+
+> **자주 하는 실수 —** `colcon build`에서 `colcon: command not found`가 출력되면 설치되지 않은 상태입니다. 위 명령으로 설치한 뒤 다시 실행합니다.
+
 ### 3.1 워크스페이스 생성
 
 ```bash
@@ -1055,7 +1079,7 @@ Day 4부터 **실행 환경이 Raspberry Pi 5로 바뀝니다.** 카메라가 CS
 |:--:|------|------|
 | ① | Raspberry Pi Imager로 **Ubuntu 24.04(64-bit)** 기록 | 부팅 후 로그인 화면 |
 | ② | 초기 설정 — 사용자·네트워크 → `sudo apt update && sudo apt upgrade` | 네트워크 연결 |
-| ③ | **ROS2 Jazzy 설치** — Day 1과 같은 단계 | 설치 오류 없음 |
+| ③ | **ROS2 Jazzy 설치** — Day 1과 같은 단계 + **빌드 도구 colcon**(3.0의 설치 명령) | 설치 오류 없음 · `which colcon` 출력 확인 |
 | ④ | 환경 등록 — `.bashrc`에 `source /opt/ros/jazzy/setup.bash` + `ROS_DOMAIN_ID` | 새 터미널에서 `ros2` 인식 |
 | ⑤ | **원격 연결** — `openssh-server` 설치 + 설정 → 공유 → 원격 데스크톱 켬 | PC에서 연결됨 |
 | ⑥ | 완료 확인 — 11.3의 명령 4종 | 4개 모두 정상 |
