@@ -168,6 +168,7 @@ turtlesim 의 `spawn` 은 이미 있는 이름을 요청하면 **응답은 정�
 | 증상 | 원인 | 대응 |
 |------|------|------|
 | `No module named 'my_first_pkg'` 또는 `'turtle_mng'` | 모듈이 다른 패키지 폴더에 복사됨 / import 문의 패키지 이름 불일치 | 2-1 의 경로 확인 — `my_first_pkg/my_first_pkg/` 안에 있어야 함 |
+| `No module named 'my_first_pkg.set_pen'` (도구 이름이 붙음) | ① `setup.py` 의 모듈명과 **파일명 불일치**(예: `setpen.py` ↔ `set_pen`) ② 파일을 넣은 뒤 재빌드하지 않음 — `ros2 run` 은 `install/` 의 설치본을 읽는다 | 파일명을 `setup.py` 와 글자 단위로 대조 → `colcon build --packages-select my_first_pkg` |
 | `No executable found` | `setup.py` 편집 후 재빌드하지 않음 | `colcon build --packages-select my_first_pkg` 재실행 |
 | `Package 'my_first_pkg' not found` | `source install/setup.bash` 누락 | 빌드한 워크스페이스의 setup.bash 를 source |
 | `list` 가 빈 목록을 출력 | turtlesim_node 미실행, 또는 `ROS_DOMAIN_ID` 가 터미널마다 다름 | ① 터미널에서 turtlesim 확인 · `echo $ROS_DOMAIN_ID` 비교 |
