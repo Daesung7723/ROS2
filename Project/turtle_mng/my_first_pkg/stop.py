@@ -11,12 +11,12 @@ stop — 주행 노드를 일시정지하거나(--resume 으로) 재개한다. t
   random_move.py 의 서비스 서버 부분(_on_enable)
 
 [실행]
-  ros2 run my_first_pkg stop turtle2            # 정지
-  ros2 run my_first_pkg stop turtle2 --resume   # 재개
+  ros2 run my_first_pkg stop leo            # 정지
+  ros2 run my_first_pkg stop leo --resume   # 재개
   ros2 run my_first_pkg stop                    # 목록만 출력
 
 [관찰할 것]
-  정지 직후 `ros2 topic echo /turtle2/cmd_vel --once` 를 실행한다 — 메시지가 오지 않고 대기하는 것이 정상이다
+  정지 직후 `ros2 topic echo /leo/cmd_vel --once` 를 실행한다 — 메시지가 오지 않고 대기하는 것이 정상이다
   (주행 노드가 발행을 멈췄으므로). 재개 후 같은 명령을 실행하면 바로 한 건이 출력된다.
 """
 

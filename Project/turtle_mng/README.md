@@ -10,16 +10,16 @@
 
 ## 1. 무엇을 만드는가
 
-`ros2 run my_first_pkg <도구>` 로 실행되는 **명령행 도구 6개**입니다. 메뉴 프로그램이 아니라, 각 도구가 한 가지 일만 하고 종료합니다(`random_move` 만 계속 실행됩니다).
+`ros2 run my_first_pkg <도구>` 로 실행되는 **명령행 도구 6개**입니다. 메뉴 프로그램이 아니라, 각 도구가 한 가지 일만 하고 즉시 종료합니다. `random_move` 도 명령은 즉시 돌아오며, 주행 노드만 **백그라운드 프로세스**로 남아 계속 실행됩니다.
 
 | 도구 | 실행 예 | 동작 |
 |------|------|------|
 | `list` | `ros2 run my_first_pkg list` | 현재 turtle 목록 + 주행 노드 실행 여부 |
-| `spawn` | `ros2 run my_first_pkg spawn [x y theta]` | 새 turtle 생성. **상한 3개체**(turtle1 포함) · 이름 자동 부여(turtle2·turtle3) · 위치 생략 시 무작위 |
-| `kill` | `ros2 run my_first_pkg kill turtle2` | turtle 제거. 그 turtle 의 주행 노드는 **스스로 종료** |
-| `random_move` | `ros2 run my_first_pkg random_move turtle2` | turtle 하나를 무작위 주행시키는 **상주 노드**(터미널 하나 = turtle 하나) |
-| `set_pen` | `ros2 run my_first_pkg set_pen turtle2 --r 255 --g 0 --b 0 --width 3` | 펜 색·두께 변경. `--off` 로 펜 올림 |
-| `stop` | `ros2 run my_first_pkg stop turtle2` / `--resume` | 주행 일시정지·재개. turtle 과 노드는 유지 |
+| `spawn` | `ros2 run my_first_pkg spawn <이름> [x y theta]` | 새 turtle 생성. **이름 필수**(영문자 시작·영문/숫자/밑줄) · **상한 3개체**(turtle1 포함) · 위치 생략 시 무작위 |
+| `kill` | `ros2 run my_first_pkg kill leo` | turtle 제거. 그 turtle 의 주행 노드는 **스스로 종료** |
+| `random_move` | `ros2 run my_first_pkg random_move leo` | turtle 하나를 무작위 주행시키는 노드를 **백그라운드로 시작**(명령은 즉시 복귀). `--foreground` 로 터미널 점유 실행 · 로그 = `/tmp/leo_driver.log` |
+| `set_pen` | `ros2 run my_first_pkg set_pen leo --r 255 --g 0 --b 0 --width 3` | 펜 색·두께 변경. `--off` 로 펜 올림 |
+| `stop` | `ros2 run my_first_pkg stop leo` / `--resume` | 주행 일시정지·재개. turtle 과 노드는 유지 |
 
 이름이 필요한 도구(`kill`·`random_move`·`set_pen`·`stop`)에서 이름을 생략하면 **현재 목록을 출력하고 종료**합니다. 목록을 보고 이름을 붙여 다시 실행합니다.
 
@@ -82,21 +82,22 @@ ros2 pkg executables my_first_pkg
 
 ## 3. 실행 시나리오
 
-터미널 4개를 사용합니다(terminator 분할 권장 — Day 2 §0.4).
+터미널 3개를 사용합니다(terminator 분할 권장 — Day 2 §0.4). ① turtlesim · ② 도구 실행 · ③ 관찰용.
 
 | 터미널 | 명령 | 확인할 것 |
 |:--:|------|------|
 | ① | `ros2 run turtlesim turtlesim_node` | turtle1 이 중앙에 생성됨 |
 | ② | `ros2 run my_first_pkg list` | turtle1 · 주행 노드 없음 |
-| ② | `ros2 run my_first_pkg spawn` ×2 | turtle2·turtle3 생성. **세 번째 spawn 은 거절**된다 |
-| ③ | `ros2 run my_first_pkg random_move turtle2` | turtle2 가 무작위 주행. 이 터미널은 계속 점유됨 |
-| ④ | `ros2 run my_first_pkg random_move turtle3` | turtle3 도 주행 |
-| ② | `ros2 run my_first_pkg list` | turtle2·turtle3 = 주행 노드 실행 중 |
-| ② | `ros2 run my_first_pkg set_pen turtle2 --r 255 --g 0 --b 0 --width 5` | turtle2 의 궤적이 빨간 굵은 선으로 바뀜 |
-| ② | `ros2 run my_first_pkg stop turtle3` | turtle3 정지. 터미널 ④ 에 "주행 정지" 로그 |
-| ② | `ros2 run my_first_pkg stop turtle3 --resume` | turtle3 재개 |
-| ② | `ros2 run my_first_pkg kill turtle2` | turtle2 사라짐. **1~2초 뒤 터미널 ③ 의 노드가 스스로 종료** |
-| ② | `ros2 node list` | `turtle2_driver` 가 없고 `turtle3_driver` 만 남음 |
+| ② | `ros2 run my_first_pkg spawn leo` · `spawn mia 2 8 1.57` | leo(무작위 위치)·mia(지정 위치) 생성. **`spawn leo` 를 다시 실행하면 중복 이름으로 거절**, 세 번째 이름도 상한으로 거절된다 |
+| ② | `ros2 run my_first_pkg random_move leo` | "백그라운드 시작 … PID …" 출력 후 **즉시 프롬프트 복귀**. leo 가 무작위 주행 |
+| ② | `ros2 run my_first_pkg random_move mia` | mia 도 주행. 같은 터미널에서 계속 작업 가능 |
+| ③ | `tail -f /tmp/leo_driver.log` | 백그라운드 노드의 로그가 실시간으로 출력됨 (이 터미널은 관찰용으로 점유) |
+| ② | `ros2 run my_first_pkg list` · `ps -ef \| grep random_move` | leo·mia = 주행 노드 실행 중 · 프로세스 2개 |
+| ② | `ros2 run my_first_pkg set_pen leo --r 255 --g 0 --b 0 --width 5` | leo 의 궤적이 빨간 굵은 선으로 바뀜 |
+| ② | `ros2 run my_first_pkg stop mia` | mia 정지. `/tmp/mia_driver.log` 에 "주행 정지" |
+| ② | `ros2 run my_first_pkg stop mia --resume` | mia 재개 |
+| ② | `ros2 run my_first_pkg kill leo` | leo 사라짐. **1~2초 뒤 터미널 ③ 에 "사라져 주행 노드를 종료합니다" 로그 후 프로세스 소멸** |
+| ② | `ros2 node list` · `ps -ef \| grep random_move` | `leo_driver` 가 없고 `mia_driver` 만 남음 · 프로세스 1개 |
 
 ---
 
@@ -104,7 +105,7 @@ ros2 pkg executables my_first_pkg
 
 ### 4-1. 상태를 저장하는 프로그램이 없다
 
-"현재 turtle 이 몇 개인가"를 기억하는 파일·데몬을 두지 않았습니다. 모든 도구는 실행될 때마다 **토픽 목록을 읽어** `/turtle2/pose` 같은 토픽이 있는지로 turtle 의 존재를 판정합니다(`common.list_turtles`). turtlesim 이 곧 정본이므로 도구와 실제 상태가 어긋날 여지가 없습니다.
+"현재 turtle 이 몇 개인가"를 기억하는 파일·데몬을 두지 않았습니다. 모든 도구는 실행될 때마다 **토픽 목록을 읽어** `/leo/pose` 같은 토픽이 있는지로 turtle 의 존재를 판정합니다(`common.list_turtles`). turtlesim 이 곧 정본이므로 도구와 실제 상태가 어긋날 여지가 없습니다.
 
 대신 **발견 지연**이 생깁니다. 노드를 만든 직후에는 다른 노드의 정보가 아직 도착하지 않았을 수 있어, 조회 전에 짧게 spin 하며 기다립니다(`common.settle`). `time.sleep()` 으로는 메시지가 처리되지 않으므로 spin 을 사용해야 한다는 점이 이 함수의 요지입니다.
 
@@ -116,15 +117,31 @@ ros2 pkg executables my_first_pkg
 
 ### 4-3. stop 은 서비스를 경유한다
 
-주행 노드는 `/turtle2/driver/enable`(`std_srvs/srv/SetBool`) 서비스를 제공하고, `stop` 도구는 그 클라이언트입니다. 서비스 이름과 노드 이름의 규칙은 `common.enable_service_name` · `common.driver_node_name` **한곳**에 있습니다 — 보내는 쪽과 받는 쪽이 같은 함수를 import 하므로 규칙이 어긋날 수 없습니다.
+주행 노드는 `/leo/driver/enable`(`std_srvs/srv/SetBool`) 서비스를 제공하고, `stop` 도구는 그 클라이언트입니다. 서비스 이름과 노드 이름의 규칙은 `common.enable_service_name` · `common.driver_node_name` **한곳**에 있습니다 — 보내는 쪽과 받는 쪽이 같은 함수를 import 하므로 규칙이 어긋날 수 없습니다.
 
 정지 시 주행 노드는 0 속도를 한 번 발행합니다. turtlesim 은 새 명령이 약 1초간 없으면 스스로 멈추지만, 실물 모터(Day 8)에서는 이 한 줄이 필수이므로 시뮬레이션에서도 같은 습관을 유지합니다.
 
-### 4-4. 이름은 자동으로 정한다
+### 4-4. 이름은 사용자가 정하고, 도구가 두 번 검증한다
 
-turtlesim 의 `spawn` 은 이미 있는 이름을 요청하면 **응답은 정상으로 오되 `name` 이 빈 문자열**입니다. 예외가 아니라 응답 내용으로 실패를 알리는 서비스이므로 반드시 검증해야 합니다(`spawn.py` 4단계). 이름을 사용자가 입력하도록 두면 이 실패 경로가 열리므로, 도구가 비어 있는 가장 작은 번호를 골라 붙입니다.
+turtle 이름은 `/leo/cmd_vel` 처럼 **토픽·서비스 이름의 일부**가 됩니다. 그래서 `spawn` 은 이름을 필수 인자로 받되, ROS2 이름 규칙(영문자 시작·영문/숫자/밑줄)에 맞는지 먼저 확인합니다(`NAME_PATTERN`).
 
-### 4-5. 새 패키지를 만들지 않는다
+turtlesim 의 `spawn` 은 이미 있는 이름을 요청하면 **응답은 정상으로 오되 `name` 이 빈 문자열**입니다. 예외가 아니라 응답 내용으로 실패를 알리는 서비스이므로, 도구는 ① 호출 전에 현재 목록과 대조하고 ② 호출 후에 응답의 `name` 을 다시 확인합니다(`spawn.py` 1·4단계). ②가 남아 있는 이유는 조회와 호출 사이에 다른 터미널이 같은 이름을 만들 수 있기 때문입니다.
+
+### 4-5. 주행 노드는 백그라운드에서 실행된다
+
+`random_move` 는 주행 노드를 직접 실행하지 않고, **자기 자신을 `--foreground` 옵션으로 다시 실행**한 뒤 바로 돌아옵니다(`_launch_background`). 세 가지 처리가 핵심입니다.
+
+| 처리 | 코드 | 없으면 생기는 일 |
+|------|------|------|
+| 세션 분리 | `start_new_session=True` | 터미널을 닫으면 SIGHUP 으로 노드가 함께 죽는다 |
+| 출력 전환 | `stdout=로그 파일` | 터미널이 사라진 뒤 출력할 곳이 없어 오류가 난다 |
+| 입력 차단 | `stdin=DEVNULL` | 배경 프로세스가 키 입력을 기다리며 멈출 수 있다 |
+
+이렇게 시작된 노드는 부모(명령을 실행한 터미널)와 무관하게 살아 있으며, **생애를 결정하는 것은 turtle 의 존재**(4-2)입니다. 따라서 노드를 끝내는 정식 경로는 `kill <이름>` 이고, turtle 은 두고 노드만 끝내려면 운영체제 수준에서 `pkill -f "random_move --foreground <이름>"` 을 사용합니다(Day 1 §5 프로세스 관리의 실전 사례).
+
+`--foreground` 는 로그를 터미널에서 직접 보며 관찰·디버깅할 때 사용합니다. 이때는 Ctrl+C 로 끝냅니다.
+
+### 4-6. 새 패키지를 만들지 않는다
 
 도구 6개를 `my_first_pkg` 에 추가하는 이유는 두 가지입니다. ① 패키지 하나가 여러 실행 파일을 담는 것이 ROS2 의 보통 모습이며, 실행 파일마다 패키지를 만들지 않습니다. ② `setup.py` 에 줄을 추가하고 재빌드하는 과정 자체가 Day 3 §3 순환의 반복 연습입니다.
 
@@ -138,10 +155,10 @@ turtlesim 의 `spawn` 은 이미 있는 이름을 요청하면 **응답은 정�
 |:--:|------|------|------|:--:|
 | 1 | `common.py` | 그래프 내성(토픽·노드 목록) · 서비스 동기 호출 4단계 · `--ros-args` 분리 | 모듈 분리 · 타입 힌트 · `dataclass` · 사용자 정의 예외 · 정규식 | ~230 |
 | 2 | `list_turtles.py` | 내성 결과의 표시 | 가장 작은 도구 — 함수 조립만 | ~40 |
-| 3 | `spawn.py` | 전역 서비스(`/spawn`) · **응답 내용으로 실패를 판정** | `argparse` `nargs` · `random` | ~90 |
+| 3 | `spawn.py` | 전역 서비스(`/spawn`) · **응답 내용으로 실패를 판정** · 이름 = 토픽 이름의 일부 | `argparse` 필수+선택 위치 인자 · 정규식 검증 · `random` | ~100 |
 | 4 | `kill.py` | 느슨한 결합 — 상대 노드를 모른 채 동작 | 검증의 함수 위임 | ~60 |
 | 5 | `set_pen.py` | turtle 별 네임스페이스 서비스 · `uint8` 범위 | `argparse` 옵션·플래그·`type` 검증 함수 | ~70 |
-| 6 | `random_move.py` | 발행·구독·타이머 2개·**서비스 서버**·파라미터(선언·실행 중 읽기)·**자기 종료**·정상 종료 순서 | `Enum` 상태 기계 · 클래스 상속 · 콜백 · 종료 예외 처리 | ~230 |
+| 6 | `random_move.py` | 발행·구독·타이머 2개·**서비스 서버**·파라미터(선언·실행 중 읽기)·**자기 종료**·정상 종료 순서 | `Enum` 상태 기계 · 클래스 상속 · 콜백 · 종료 예외 처리 · **`subprocess` 자기 재실행·세션 분리·로그 파일** | ~280 |
 | 7 | `stop.py` | 노드 간 제어 채널 = 서비스 | 플래그 → 요청 번역 | ~70 |
 | — | `reference/setup.py` · `package.xml` | `entry_points` = `ros2 run` 이름 · `exec_depend` | 패키징 | — |
 
@@ -154,11 +171,12 @@ turtlesim 의 `spawn` 은 이미 있는 이름을 요청하면 **응답은 정�
 | 명령 | 무엇을 보는가 |
 |------|------|
 | `ros2 topic list` | spawn 직후 토픽 5개(`cmd_vel`·`pose`·`color_sensor` + 서비스 내부 토픽)가 한 번에 생김 |
-| `ros2 node list` | `turtle2_driver` 처럼 노드 이름이 turtle 이름을 따름. 일회성 도구는 이름 뒤에 PID 가 붙음 |
-| `rqt_graph` | 주행 노드 → `/turtle2/cmd_vel` → `turtlesim` · `/turtle2/pose` → 주행 노드의 양방향 연결 |
+| `ros2 node list` | `leo_driver` 처럼 노드 이름이 turtle 이름을 따름. 일회성 도구는 이름 뒤에 PID 가 붙음 |
+| `ps -ef \| grep random_move` · `tail -f /tmp/leo_driver.log` | 백그라운드 노드의 프로세스와 로그. 터미널을 닫아도 남아 있는 것 |
+| `rqt_graph` | 주행 노드 → `/leo/cmd_vel` → `turtlesim` · `/leo/pose` → 주행 노드의 양방향 연결 |
 | `ros2 service list \| grep driver` | 주행 노드가 제공하는 `enable` 서비스 |
-| `ros2 param list /turtle2_driver` · `ros2 param set /turtle2_driver linear_max 0.5` | 실행 중 파라미터 변경 → 속도 즉시 반영 |
-| `ros2 topic echo /turtle2/cmd_vel --once` | stop 상태에서는 대기, 재개 후에는 즉시 1건 출력 |
+| `ros2 param list /leo_driver` · `ros2 param set /leo_driver linear_max 0.5` | 실행 중 파라미터 변경 → 속도 즉시 반영 |
+| `ros2 topic echo /leo/cmd_vel --once` | stop 상태에서는 대기, 재개 후에는 즉시 1건 출력 |
 | `ros2 interface show turtlesim/srv/Spawn` · `SetPen` | 요청·응답 필드. `SetPen.off` 가 `uint8` 인 것 |
 
 ---
@@ -174,8 +192,11 @@ turtlesim 의 `spawn` 은 이미 있는 이름을 요청하면 **응답은 정�
 | `list` 가 빈 목록을 출력 | turtlesim_node 미실행, 또는 `ROS_DOMAIN_ID` 가 터미널마다 다름 | ① 터미널에서 turtlesim 확인 · `echo $ROS_DOMAIN_ID` 비교 |
 | `stop` 이 "주행 노드가 실행 중이 아닙니다" | 그 turtle 에 `random_move` 를 실행하지 않았음 | `random_move <이름>` 먼저 실행 |
 | kill 후 주행 노드가 종료되지 않음 | 1.5초의 판정 지연 안에 확인함 | 2초 이상 기다린 뒤 `ros2 node list` |
+| `random_move` 가 "이미 실행 중" 이라고 거절 | 이전에 시작한 백그라운드 노드가 아직 살아 있음(turtle 이 남아 있으면 계속 실행됨) | `ps -ef \| grep random_move` 로 확인 → `kill <이름>` 또는 `pkill -f "random_move --foreground <이름>"` |
+| turtlesim 을 껐는데 주행 노드 프로세스가 남아 있음 | turtlesim 종료 = 모든 pose 발행자 소멸 → 노드들이 1~2초 안에 자기 종료하는 것이 정상 | 남아 있으면 `pkill -f random_move` |
 | kill 후 궤적이 남음 | turtlesim 의 정상 동작 — 펜 자국은 turtle 과 별개 | `ros2 service call /clear std_srvs/srv/Empty` |
-| spawn 이 거절됨 | 상한 3개체 도달 | `kill` 로 하나 제거 후 재실행 |
+| spawn 이 거절됨 — "이미 3개체" | 상한 도달 | `kill` 로 하나 제거 후 재실행 |
+| spawn 이 거절됨 — "이미 있습니다" / "영문자로 시작" | 중복 이름 / 이름 규칙 위반(공백·하이픈·한글·숫자 시작) | 다른 이름으로 재실행 |
 
 ---
 

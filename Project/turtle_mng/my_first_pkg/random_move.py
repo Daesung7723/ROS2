@@ -1,27 +1,34 @@
 """
-random_move — turtle 하나를 무작위로 주행시키는 상주 노드
+random_move — turtle 하나를 무작위로 주행시키는 상주 노드 (백그라운드 실행)
 
-여섯 도구 중 유일하게 계속 실행되는 프로그램이다. turtle 마다 하나씩 실행한다(터미널 하나 = turtle 하나).
+여섯 도구 중 유일하게 계속 실행되는 프로그램이다. turtle 마다 하나씩 실행한다.
+기본 동작 = **백그라운드**: 명령은 즉시 돌아오고, 주행 노드는 터미널과 분리된 별도 프로세스로 계속 실행된다.
+그 프로세스는 turtle 이 kill 되면 스스로 종료한다.
 
 [이 파일이 다루는 개념]
   ROS2   : 발행(cmd_vel) · 구독(pose) · 타이머 두 개(주행·감시) · 서비스 서버(SetBool) · 파라미터(선언·실행 중 읽기)
            노드의 자기 종료 — 자신이 제어하던 turtle 이 사라지면(kill) 스스로 끝난다
            정상 종료 순서 — 마지막 명령을 0 으로 발행 → destroy_node → shutdown
   Python : 클래스 상속(Node) · Enum 으로 상태 기계 · 콜백 메서드 · 예외로 종료 신호 받기(KeyboardInterrupt)
+           subprocess 로 자기 자신을 다시 실행 · 세션 분리(start_new_session) · 로그 파일로 출력 전환
 
 [읽기 전 알아야 할 것]
-  Day 2 §4~5 (rclpy 노드 구조 · 발행/구독 스크립트) · Day 3 §4 (파라미터) · Day 3 §9 (상태 기계)
+  Day 1 §5 (프로세스 관리 — ps · kill · 세션) · Day 2 §4~5 (rclpy 노드 구조) · Day 3 §4 (파라미터) · Day 3 §9 (상태 기계)
 
 [실행]
-  ros2 run my_first_pkg random_move turtle2
-  ros2 run my_first_pkg random_move turtle2 --ros-args -p linear_max:=3.0 -p margin:=2.0
-  종료 = Ctrl+C  또는  다른 터미널에서 kill turtle2
+  ros2 run my_first_pkg random_move leo                       # 백그라운드 시작 → 즉시 프롬프트로 돌아온다
+  ros2 run my_first_pkg random_move leo --ros-args -p linear_max:=3.0 -p margin:=2.0
+  ros2 run my_first_pkg random_move leo --foreground          # 터미널을 점유하며 실행 (로그를 직접 보며 관찰·디버깅)
+  정지·재개 = stop leo / stop leo --resume   ·   종료 = kill leo (turtle 제거 → 노드 자기 종료)
+  turtle 은 두고 노드만 끝내려면 = pkill -f "random_move --foreground leo"
 
 [관찰할 것]
-  · `ros2 node list` — turtle2_driver 가 보인다.  `rqt_graph` — 노드 ↔ /turtle2/cmd_vel ↔ turtlesim 연결.
-  · `ros2 service list | grep driver` — /turtle2/driver/enable 이 이 노드가 제공하는 서비스다.
-  · `ros2 param list /turtle2_driver` · `ros2 param set /turtle2_driver linear_max 0.5` — 실행 중에 속도가 바뀐다.
-  · 다른 터미널에서 kill turtle2 → 이 노드가 1~2초 안에 스스로 종료한다.
+  · `ros2 node list` — leo_driver 가 보인다.  `rqt_graph` — 노드 ↔ /leo/cmd_vel ↔ turtlesim 연결.
+  · `ps -ef | grep random_move` — 백그라운드 프로세스. 터미널을 닫아도 살아 있다(세션 분리).
+  · `tail -f /tmp/leo_driver.log` — 백그라운드 노드의 로그.
+  · `ros2 service list | grep driver` — /leo/driver/enable 이 이 노드가 제공하는 서비스다.
+  · `ros2 param set /leo_driver linear_max 0.5` — 실행 중에 속도가 바뀐다.
+  · kill leo → 이 노드가 1~2초 안에 스스로 종료한다 (`ps` 로 확인).
 """
 
 from __future__ import annotations
@@ -29,8 +36,11 @@ from __future__ import annotations
 import argparse
 import math
 import random
+import subprocess
 import sys
+import tempfile
 from enum import Enum, auto
+from pathlib import Path
 
 import rclpy
 from rclpy.executors import ExternalShutdownException
@@ -223,7 +233,42 @@ class RandomMover(Node):
 def _parse(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="ros2 run my_first_pkg random_move", description="turtle 무작위 주행 노드")
     parser.add_argument("name", nargs="?", help="주행시킬 turtle 이름 (생략 시 목록 출력)")
+    parser.add_argument("--foreground", action="store_true",
+                        help="터미널을 점유하며 실행 (기본 = 백그라운드). 백그라운드 모드가 내부적으로 이 옵션으로 자신을 다시 실행한다")
     return parser.parse_args(argv)
+
+
+def _log_path(name: str) -> Path:
+    """백그라운드 노드의 출력이 저장되는 파일. /tmp/<turtle>_driver.log"""
+    return Path(tempfile.gettempdir()) / f"{driver_node_name(name)}.log"
+
+
+def _launch_background(name: str) -> int:
+    """
+    자기 자신을 `--foreground` 옵션으로 **다시 실행**하되, 터미널과 분리된 새 세션에서 실행한다.
+
+    - `python -m my_first_pkg.random_move` : 이 모듈을 프로그램으로 실행 (`if __name__ == "__main__"` 경로)
+    - sys.argv[1:] 를 그대로 넘기므로 `--ros-args -p …` 도 자식에게 전달된다
+    - start_new_session=True : 자식이 새 세션의 리더가 된다 → 터미널을 닫아도(SIGHUP) 살아남는다
+    - stdout/stderr → 로그 파일 : 터미널이 사라진 뒤에도 출력이 갈 곳이 있어야 한다
+    - stdin → DEVNULL : 배경 프로세스가 키 입력을 기다리는 일이 없도록
+    부모(이 함수)는 자식의 종료를 기다리지 않고 바로 돌아온다. 자식의 생애는 turtle 의 존재(_watch)가 결정한다.
+    """
+    log = _log_path(name)
+    cmd = [sys.executable, "-m", "my_first_pkg.random_move", "--foreground"] + sys.argv[1:]
+    with open(log, "ab") as log_file:
+        proc = subprocess.Popen(
+            cmd,
+            stdin=subprocess.DEVNULL,
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+    print(f"백그라운드 시작: {driver_node_name(name)}  (PID {proc.pid})  로그 = {log}")
+    print(f"→ 정지/재개:  ros2 run my_first_pkg stop {name} [--resume]")
+    print(f"→ 종료:       ros2 run my_first_pkg kill {name}   (turtle 제거 → 노드 자기 종료)")
+    print(f"→ 노드만 종료: pkill -f \"random_move --foreground {name}\"")
+    return 0
 
 
 def main() -> int:
@@ -233,15 +278,22 @@ def main() -> int:
         args = _parse(user_args())
 
         # 1) 이름 확정·중복 실행 확인 — 임시 노드로 조회한 뒤 버린다.
+        #    백그라운드 모드에서는 이 검사를 부모(터미널)에서 먼저 하므로 오류가 터미널에 바로 표시된다.
         probe = make_tool_node("turtle_random_move_probe")
         try:
             name = resolve_name(probe, args.name)
             if driver_node_name(name) in probe.get_node_names():
-                raise TurtleToolError(f"'{name}' 의 주행 노드가 이미 실행 중입니다. (터미널을 확인)")
+                raise TurtleToolError(
+                    f"'{name}' 의 주행 노드가 이미 실행 중입니다. (`ps -ef | grep random_move` 로 확인)"
+                )
         finally:
             probe.destroy_node()
 
-        # 2) 주행 노드 생성 후 spin. rclpy.spin() 대신 spin_once 반복을 쓰는 이유 = gone 플래그를 확인하기 위해.
+        # 2-a) 백그라운드 모드(기본): 자신을 다시 실행하고 즉시 돌아온다.
+        if not args.foreground:
+            return _launch_background(name)
+
+        # 2-b) 포그라운드 모드: 주행 노드 생성 후 spin. rclpy.spin() 대신 spin_once 반복을 쓰는 이유 = gone 플래그 확인.
         mover = RandomMover(name)
         while rclpy.ok() and not mover.gone:
             rclpy.spin_once(mover, timeout_sec=0.1)

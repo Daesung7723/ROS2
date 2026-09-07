@@ -10,7 +10,7 @@ kill — turtle 을 제거한다. 그 turtle 의 주행 노드는 스스로 종�
   Day 2 §2.3 · common.py · (주행 노드의 자기 종료는 random_move.py 의 watchdog 참조)
 
 [실행]
-  ros2 run my_first_pkg kill turtle2
+  ros2 run my_first_pkg kill leo
   ros2 run my_first_pkg kill            # 이름 없음 → 목록만 출력하고 종료
 
 [관찰할 것]

@@ -2,7 +2,7 @@
 set_pen — turtle 의 펜 색·두께·on/off 를 바꾼다
 
 [이 파일이 다루는 개념]
-  ROS2   : turtle 별 네임스페이스 서비스 — /turtle2/set_pen 처럼 이름이 경로에 들어간다
+  ROS2   : turtle 별 네임스페이스 서비스 — /leo/set_pen 처럼 이름이 경로에 들어간다
            uint8 필드 — 0~255 범위를 넘기면 메시지 생성 시점에 예외가 난다
   Python : argparse 옵션 인자(--r --g --b) · store_true 플래그 · 범위 검증용 type 함수
 
@@ -10,8 +10,8 @@ set_pen — turtle 의 펜 색·두께·on/off 를 바꾼다
   Day 2 §2.4 (CLI 로 set_pen 해 본 경험)
 
 [실행]
-  ros2 run my_first_pkg set_pen turtle2 --r 255 --g 0 --b 0 --width 3
-  ros2 run my_first_pkg set_pen turtle2 --off        # 펜을 든다(궤적을 그리지 않음)
+  ros2 run my_first_pkg set_pen leo --r 255 --g 0 --b 0 --width 3
+  ros2 run my_first_pkg set_pen leo --off        # 펜을 든다(궤적을 그리지 않음)
   ros2 run my_first_pkg set_pen                       # 목록만 출력
 
 [관찰할 것]

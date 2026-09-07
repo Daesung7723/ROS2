@@ -39,7 +39,7 @@ from rclpy.utilities import remove_ros_args
 #: 동시에 존재할 수 있는 turtle 개체 수의 상한. turtlesim_node 가 자동 생성하는 turtle1 을 포함한다.
 MAX_TURTLES = 3
 
-#: turtle 이름의 규칙. turtlesim 은 임의 이름을 허용하지만, 이 도구 모음은 turtle1·turtle2·turtle3 으로 통일한다.
+#: turtlesim 기본 이름(turtle1, turtle2 …)의 형태. 목록 정렬에서 번호 순서를 맞추는 데만 쓴다 — 이름 제한이 아니다.
 TURTLE_NAME_PATTERN = re.compile(r"^turtle(\d+)$")
 
 #: turtlesim 의 pose 토픽 타입. 이 타입의 토픽이 있으면 그 이름의 turtle 이 존재한다고 판정한다.
@@ -195,23 +195,6 @@ def resolve_name(node: Node, requested: Optional[str]) -> str:
         raise TurtleToolError(f"'{requested}' 라는 turtle 이 없습니다.")
 
     return requested
-
-
-def next_turtle_name(existing: list[str]) -> Optional[str]:
-    """
-    새 turtle 에 붙일 이름을 정한다. turtle1 ~ turtle{MAX_TURTLES} 중 비어 있는 가장 작은 번호.
-    상한에 도달했으면 None.
-
-    이름을 자동으로 정하는 이유: turtlesim 의 spawn 은 이미 있는 이름을 요청하면 실패하고
-    응답의 name 을 빈 문자열로 돌려준다. 이름을 사용자가 입력하게 두면 이 실패 경로가 생긴다.
-    """
-    if len(existing) >= MAX_TURTLES:
-        return None
-    for i in range(1, MAX_TURTLES + 1):
-        candidate = f"turtle{i}"
-        if candidate not in existing:
-            return candidate
-    return None
 
 
 # ──────────────────────────────────────────────────────────────
