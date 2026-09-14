@@ -60,7 +60,7 @@ Day 3까지의 복습:
 | 품목 | 확인 사항 |
 |------|----------|
 | **Raspberry Pi 5** | **과제 완료 상태** — ① Ubuntu 24.04 + ROS2 Jazzy 구축 ② **SSH(Secure Shell)·원격 데스크톱(RDP, Remote Desktop Protocol) 연결 설정**(Day 3 자료 11장). 상태는 1.2에서 확인 |
-| **CSI(Camera Serial Interface) 카메라 모듈** | 플랫 케이블 방향 주의(접점 면) — **전원을 끈 상태에서 연결** |
+| **CSI(Camera Serial Interface) 카메라 모듈** | **RPi5용 22핀↔15핀 카메라 변환 케이블** 필요 · 플랫 케이블 방향 주의(접점 면) — **전원을 끈 상태에서 연결** |
 | 강의실 PC | RPi5 원격 연결 단말(원격 데스크톱·SSH) |
 | 유선 랜 또는 Wi-Fi | RPi5와 PC가 **같은 네트워크** |
 | microSD·전원 어댑터 | 5V/5A 권장 |
@@ -271,23 +271,62 @@ ros2 run turtlesim turtlesim_node
 
 - CSI는 **RPi 전용 규격** — 전송 대역이 넓고 지연이 짧지만 다른 컴퓨터에 꽂을 수 없음. 이것이 오늘부터 RPi5를 쓰는 이유(2.1)
 
+케이블 규격 확인 — 연결 전에 먼저 확인합니다.
+
+| 구분 | 커넥터 |
+|------|------|
+| RPi5 보드 | **22핀·0.5mm 간격 소형 커넥터** 2개 — 보드 표시 `CAM/DISP0`·`CAM/DISP1` |
+| 카메라 모듈 | 15핀·1mm 간격 표준 커넥터 |
+| 필요한 케이블 | **RPi5용 22핀↔15핀 카메라 변환 케이블** |
+
+- 카메라 모듈에 함께 들어 있는 15핀↔15핀 케이블은 **RPi5에 끼울 수 없음**
+- 디스플레이용 케이블과 카메라용 케이블은 서로 바꿔 쓰지 않음
+- 연결한 커넥터 번호(`CAM/DISP0` 또는 `CAM/DISP1`)를 기억 — 설정 파일에서 사용
+
 연결 절차 — 전원을 끈 상태에서:
 
 1. 카메라 커넥터의 검은 고정 클립을 위로 당김
 2. 플랫 케이블의 **접점 면이 보드 안쪽**을 향하도록 삽입
 3. 클립을 눌러 고정 → 전원 인가·부팅
 
+인식 확인 — 커널이 카메라를 인식했는지 먼저 확인합니다:
+
 ```bash
-cam -l                                # 인식 확인 — 카메라 모델명이 출력되면 정상
+sudo dmesg | grep -i -E "imx|ov5647"   # 센서 이름이 보이면 커널이 인식한 것
+ls /dev/media* /dev/video*             # 카메라 장치 파일 생성 확인
 ```
 
-- `cam`은 5.1에서 설치하는 `libcamera-tools`에 포함된 확인 도구 — 설치 명령 실행 후 사용
+- 카메라는 저장 장치가 아니므로 마운트 작업이 없음 — 드라이버가 인식하면 장치 파일이 자동으로 생성됨
+- libcamera 인식 확인(`cam -l`)은 5.1 설치 후 수행
 
 > **자주 하는 실수**
 >
+> - **15핀 케이블을 RPi5에 끼우려 함** — 규격이 달라 연결되지 않음. 변환 케이블 사용
 > - **케이블 방향 반대** — 인식되지 않음. 접점 면 방향을 다시 확인
 > - **전원 인가 상태에서 착탈** — 모듈 손상 위험
 > - 클립을 덜 눌러 접촉 불량 — 흔들면 인식이 끊김
+
+센서 이름이 보이지 않으면 — 설정 파일 확인:
+
+```bash
+grep camera /boot/firmware/config.txt   # 현재 카메라 설정 확인
+sudo nano /boot/firmware/config.txt     # 자동 인식이 되지 않을 때만 편집
+```
+
+자동 인식으로 잡히지 않으면 아래 두 줄을 넣고 저장한 뒤 **재부팅**합니다:
+
+```
+camera_auto_detect=0
+dtoverlay=imx708,cam0
+```
+
+| 항목 | 값 |
+|------|------|
+| 센서명 | Camera Module 3 = `imx708` · Camera Module v2 = `imx219` · Camera Module v1 = `ov5647` |
+| 커넥터 | `CAM/DISP0` = `cam0` · `CAM/DISP1` = `cam1` |
+
+- 재부팅 후 위 인식 확인 명령을 다시 실행
+- 모델명을 모르면 모듈 뒷면 표기를 확인하고 교수에게 알림
 
 ### 4.2 이미지 토픽의 구조
 
@@ -375,7 +414,7 @@ cam -l                                # 카메라 인식 확인 — 모델명이
 ros2 pkg list | grep camera           # camera_ros 등록 확인
 ```
 
-> **RPi5 + Ubuntu 24.04 주의 —** apt로 설치되는 libcamera는 **원본(upstream) 판**이며, RPi5 카메라 처리에 필요한 Raspberry Pi 전용 구성 요소가 포함되지 않은 경우가 많습니다. 증상은 `cam -l`의 빈 목록 또는 카메라 노드의 `no cameras available` 출력입니다. 케이블 연결(4.1)을 확인했는데도 목록이 비어 있으면 **Raspberry Pi판 libcamera 소스 빌드(10.1 — 20~40분)**로 즉시 전환합니다.
+> **RPi5 + Ubuntu 24.04 주의 —** apt로 설치되는 libcamera는 **원본(upstream) 판**이며, RPi5 카메라 처리에 필요한 Raspberry Pi 전용 구성 요소가 포함되지 않은 경우가 많습니다. 증상은 `cam -l`의 빈 목록 또는 카메라 노드의 `no cameras available` 출력입니다. 4.1 인식 확인에서 **센서 이름이 보이는데도** `cam -l` 목록이 비어 있으면 **Raspberry Pi판 libcamera 소스 빌드(10.1 — 20~40분)**로 즉시 전환합니다. 센서 이름이 보이지 않으면 소스 빌드가 아니라 **케이블·설정 파일(4.1)**을 먼저 확인합니다.
 
 > **여기서 실패하면 이후 진행이 막힙니다 —** 카메라 스택이 구동되지 않으면 6장 이후가 전부 막힙니다. 소스 빌드도 실패하면 아래 **대체 경로**로 진행합니다.
 
@@ -436,17 +475,18 @@ ros2 run rqt_image_view rqt_image_view
 
 - 확인 지점 — **카메라 → 토픽 → 뷰어**의 경로가 성립. 이 사이에 우리 노드를 끼워 넣는 것이 7장
 
-**정상 동작 확인 — 3단계**
+**정상 동작 확인 — 4단계**
 
 앞 단계가 성립해야 다음 단계를 확인할 수 있습니다. 확인이 멈춘 단계가 원인의 위치입니다.
 
 | 단계 | 확인 대상 | 명령 | 정상 |
 |:--:|------|------|------|
-| ① | 카메라 인식 | `cam -l` | 카메라 모델명 출력 |
-| ② | 토픽 발행 | `ros2 topic hz /camera/image_raw` | 약 30Hz |
-| ③ | 영상 | `rqt_image_view` → `/camera/image_raw` | 영상 표시 |
+| ① | 커널 인식 | `sudo dmesg \| grep -i -E "imx\|ov5647"` | 센서 이름 출력 |
+| ② | libcamera 인식 | `cam -l` | 카메라 모델명 출력 |
+| ③ | 토픽 발행 | `ros2 topic hz /camera/image_raw` | 약 30Hz |
+| ④ | 영상 | `rqt_image_view` → `/camera/image_raw` | 영상 표시 |
 
-- ① 실패 = 케이블 연결(4.1) 또는 libcamera 판(10.1) / ② 실패 = 카메라 노드 미실행·`ROS_DOMAIN_ID` 불일치 / ③ 실패 = 원격 데스크톱 연결(3.2)
+- ① 실패 = 케이블 규격·연결·설정 파일(4.1) / ② 실패 = libcamera 판(10.1) / ③ 실패 = 카메라 노드 미실행·`ROS_DOMAIN_ID` 불일치 / ④ 실패 = 원격 데스크톱 연결(3.2)
 - 이미지 토픽은 `topic echo`로 출력하지 않습니다 — 픽셀 값 배열이 화면을 채웁니다
 
 ---
@@ -841,8 +881,8 @@ self.pub.publish(twist)
 
 | 증상 | 원인 | 조치 |
 |------|------|------|
-| `cam -l`에 모델명이 없음 | 케이블 방향 반대 · 클립 접촉 불량 | 전원을 끄고 4.1 절차로 재연결 |
-| 케이블이 정상인데도 `cam -l` 빈 목록 · 카메라 노드가 `no cameras available` 출력 | apt 원본 판 libcamera — RPi5 카메라 처리 구성 요소 없음 | 10.1 Raspberry Pi판 libcamera 소스 빌드 |
+| `dmesg`에 센서 이름이 없음 | 15핀 케이블 사용 · 케이블 방향 반대 · 클립 접촉 불량 · 자동 인식 실패 | 전원을 끄고 4.1 절차로 재연결 → 그래도 없으면 4.1 설정 파일 확인·재부팅 |
+| 센서 이름은 보이는데 `cam -l` 빈 목록 · 카메라 노드가 `no cameras available` 출력 | apt 원본 판 libcamera — RPi5 카메라 처리 구성 요소 없음 | 10.1 Raspberry Pi판 libcamera 소스 빌드 |
 | 소스 빌드 후에도 인식되지 않음 | 사용자 권한 · 카메라 모델별 설정 | `groups`에 `video`가 없으면 `sudo usermod -aG video $USER` 후 재로그인 · 모델명을 교수에게 알림 |
 | `ros2 pkg list`에 `camera_ros`가 없음 | apt 패키지 미설치·미제공 | 5.1 재설치 → 실패 시 10.1 소스 빌드 |
 | `/camera/image_raw`가 목록에 없음 | 카메라 노드 미실행 · 다른 터미널의 `ROS_DOMAIN_ID` 불일치 | `ros2 node list`로 노드 확인 → `echo $ROS_DOMAIN_ID` 대조 |
@@ -860,7 +900,7 @@ self.pub.publish(twist)
 | `ModuleNotFoundError: cv2` 또는 `cv_bridge` | 패키지 미설치 | 7.1 설치 명령 재실행 · `package.xml`에 `<depend>cv_bridge</depend>` 추가 |
 | `IndexError` 또는 슬라이스 오류 | `int()` 없이 실수 인덱스 사용 | 8.2 자주 하는 실수 |
 
-- 진단의 기본 순서 = **카메라 자체(`cam -l`) → 토픽(`topic hz`) → 마스크(7.5) → 좌표(`topic echo /target_point`)** — 앞에서 뒤로 한 단계씩 확인합니다
+- 진단의 기본 순서 = **커널 인식(`dmesg`) → libcamera 인식(`cam -l`) → 토픽(`topic hz`) → 마스크(7.5) → 좌표(`topic echo /target_point`)** — 앞에서 뒤로 한 단계씩 확인합니다
 
 ---
 
@@ -904,7 +944,7 @@ ros2 run camera_ros camera_node       # no cameras available이 출력되지 않
 | `~/camera_ws` | `~/ros2_ws`와 분리한 작업 공간 — 이후 `~/ros2_ws` 빌드 때 libcamera를 다시 빌드하지 않음 |
 
 - RPi5에서 **20~40분** 소요 — 빌드가 진행되는 동안 4·6장 이론을 읽어 둡니다
-- 이후 확인은 5.3 3단계 ②③으로 수행
+- 이후 확인은 5.3 4단계 ②~④로 수행
 - 빌드가 중간에 실패하면 오류가 난 패키지를 확인하고 `--packages-select`로 해당 패키지만 재시도(Day 3 자료 10장)
 - 그래도 인식되지 않으면 9장 카메라·토픽 표의 권한·모델 항목을 확인
 - 실패에 대비해 별도 경로를 준비해 두는 같은 방식을 Day 8 결선·Day 9 실물 전환에서도 사용합니다
