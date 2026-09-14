@@ -495,11 +495,11 @@ ros2 run rqt_image_view rqt_image_view
 |:--:|------|------|------|
 | 1 | 커널의 카메라 인식 | `sudo dmesg \| grep -i imx708` | `imx708` 출력 |
 | 2 | 카메라 단독 동작(ROS 없이) | `cam -l` → `cam` 촬영(아래) | 사진 파일 생성·장면 확인 |
-| 3 | ROS에서 카메라 동작 | `ros2 pkg prefix camera_ros` → `ros2 run camera_ros camera_node` | 경로 `camera_ws` · 로그 `0: imx708_wide` |
+| 3 | ROS에서 카메라 동작 | `ros2 run camera_ros camera_node` | 로그 `0: imx708_wide` |
 | 4 | 영상 토픽 발행 | `ros2 topic hz /camera/image_raw` | 약 30Hz |
 | 5 | 최종 검증 | `rqt_image_view` → `/camera/image_raw` | 영상 표시 · 카메라 앞 움직임이 화면에 즉시 반영 |
 
-- 1 실패 = 케이블·설정 파일(4.1) / 2 실패 = libcamera 빌드(10.1) / 3 실패 = `camera_ws` 환경 등록(10.1) / 4 실패 = 노드 종료·`ROS_DOMAIN_ID` 불일치 / 5 실패 = 원격 데스크톱 연결(3.2)
+- 1 실패 = 케이블·설정 파일(4.1) / 2 실패 = libcamera 빌드(10.1) / 3 실패 = `ros2 pkg prefix camera_ros`로 apt판 여부 확인(10.1) / 4 실패 = 노드 종료·`ROS_DOMAIN_ID` 불일치 / 5 실패 = 원격 데스크톱 연결(3.2)
 - 이미지 토픽은 `topic echo`로 출력하지 않습니다 — 픽셀 값 배열이 화면을 채웁니다
 
 2단계 — ROS 없이 카메라 확인 (10.1 소스 빌드 완료 후):
@@ -975,7 +975,7 @@ ros2 run camera_ros camera_node       # no cameras available이 출력되지 않
 | `~/camera_ws` | `~/ros2_ws`와 분리한 작업 공간 — 이후 `~/ros2_ws` 빌드 때 libcamera를 다시 빌드하지 않음 |
 
 - RPi5에서 **약 10~20분**(실측 1대 10분 38초) — 빌드가 진행되는 동안 4·6장 이론을 읽어 둡니다
-- 완료 판정 = 마지막 줄 `Summary: 2 packages finished`(libcamera·camera_ros)
+- 완료 확인 = 마지막 줄 `Summary: 2 packages finished`(libcamera·camera_ros)
 - 이후 확인은 5.3 **카메라 동작 확인 5단계**의 2~5단계로 수행
 - 빌드가 중간에 실패하면 오류가 난 패키지를 확인하고 `--packages-select`로 해당 패키지만 재시도(Day 3 자료 10장)
 - 그래도 인식되지 않으면 9장 카메라·토픽 표의 권한·커넥터 항목을 확인
