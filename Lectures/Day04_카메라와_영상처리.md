@@ -60,7 +60,7 @@ Day 3까지의 복습:
 | 품목 | 확인 사항 |
 |------|----------|
 | **Raspberry Pi 5** | **과제 완료 상태** — ① Ubuntu 24.04 + ROS2 Jazzy 구축 ② **SSH(Secure Shell)·원격 데스크톱(RDP, Remote Desktop Protocol) 연결 설정**(Day 3 자료 11장). 상태는 1.2에서 확인 |
-| **CSI(Camera Serial Interface) 카메라 모듈** | **RPi5용 22핀↔15핀 카메라 변환 케이블** 필요 · 플랫 케이블 방향 주의(접점 면) — **전원을 끈 상태에서 연결** |
+| **CSI(Camera Serial Interface) 카메라 모듈** | **Camera Module 3 Wide**(센서 IMX708) · 케이블 = **Camera Cable Standard–Mini 200mm**(RPi5용 22핀↔15핀) · 접점 면 방향 주의 — **전원을 끈 상태에서 연결** |
 | 강의실 PC | RPi5 원격 연결 단말(원격 데스크톱·SSH) |
 | 유선 랜 또는 Wi-Fi | RPi5와 PC가 **같은 네트워크** |
 | microSD·전원 어댑터 | 5V/5A 권장 |
@@ -277,7 +277,7 @@ ros2 run turtlesim turtlesim_node
 |------|------|
 | RPi5 보드 | **22핀·0.5mm 간격 소형 커넥터** 2개 — 보드 표시 `CAM/DISP0`·`CAM/DISP1` |
 | 카메라 모듈 | 15핀·1mm 간격 표준 커넥터 |
-| 필요한 케이블 | **RPi5용 22핀↔15핀 카메라 변환 케이블** |
+| 필요한 케이블 | **RPi5용 22핀↔15핀 카메라 변환 케이블** — 이 과정 = Camera Cable Standard–Mini 200mm |
 
 - 카메라 모듈에 함께 들어 있는 15핀↔15핀 케이블은 **RPi5에 끼울 수 없음**
 - 디스플레이용 케이블과 카메라용 케이블은 서로 바꿔 쓰지 않음
@@ -292,7 +292,7 @@ ros2 run turtlesim turtlesim_node
 인식 확인 — 커널이 카메라를 인식했는지 먼저 확인합니다:
 
 ```bash
-sudo dmesg | grep -i -E "imx|ov5647"   # 센서 이름이 보이면 커널이 인식한 것
+sudo dmesg | grep -i imx708            # imx708이 보이면 커널이 카메라를 인식한 것
 ls /dev/media* /dev/video*             # 카메라 장치 파일 생성 확인
 ```
 
@@ -306,7 +306,7 @@ ls /dev/media* /dev/video*             # 카메라 장치 파일 생성 확인
 > - **전원 인가 상태에서 착탈** — 모듈 손상 위험
 > - 클립을 덜 눌러 접촉 불량 — 흔들면 인식이 끊김
 
-센서 이름이 보이지 않으면 — 설정 파일 확인:
+`imx708`이 보이지 않으면 — 설정 파일 확인:
 
 ```bash
 grep camera /boot/firmware/config.txt   # 현재 카메라 설정 확인
@@ -322,11 +322,11 @@ dtoverlay=imx708,cam0
 
 | 항목 | 값 |
 |------|------|
-| 센서명 | Camera Module 3 = `imx708` · Camera Module v2 = `imx219` · Camera Module v1 = `ov5647` |
-| 커넥터 | `CAM/DISP0` = `cam0` · `CAM/DISP1` = `cam1` |
+| 센서명 | **이 과정 카메라(Camera Module 3 Wide) = `imx708`** — Wide 모델도 같은 이름 사용 |
+| 커넥터 | `CAM/DISP0` = `,cam0` · `CAM/DISP1` = `,cam1` |
 
 - 재부팅 후 위 인식 확인 명령을 다시 실행
-- 모델명을 모르면 모듈 뒷면 표기를 확인하고 교수에게 알림
+- `,cam0`을 생략하면 `CAM/DISP1` 커넥터를 찾음 — 실제로 꽂은 커넥터 번호에 맞춤
 
 ### 4.2 이미지 토픽의 구조
 
@@ -404,7 +404,7 @@ sudo apt install -y libcamera-dev libcamera-tools python3-libcamera
 sudo apt install -y ros-jazzy-camera-ros ros-jazzy-image-tools ros-jazzy-rqt-image-view
 ```
 
-- 배포 패키지가 없거나 동작하지 않으면 **소스 빌드**로 전환(10.1)
+- 이 과정의 카메라(Camera Module 3 Wide)는 **10.1 소스 빌드를 기본 경로**로 함 — 아래 주의 참조
 - 설치가 진행되는 동안 4·6장 이론을 읽어 둡니다
 
 **설치 확인**:
@@ -414,7 +414,7 @@ cam -l                                # 카메라 인식 확인 — 모델명이
 ros2 pkg list | grep camera           # camera_ros 등록 확인
 ```
 
-> **RPi5 + Ubuntu 24.04 주의 —** apt로 설치되는 libcamera는 **원본(upstream) 판**이며, RPi5 카메라 처리에 필요한 Raspberry Pi 전용 구성 요소가 포함되지 않은 경우가 많습니다. 증상은 `cam -l`의 빈 목록 또는 카메라 노드의 `no cameras available` 출력입니다. 4.1 인식 확인에서 **센서 이름이 보이는데도** `cam -l` 목록이 비어 있으면 **Raspberry Pi판 libcamera 소스 빌드(10.1 — 20~40분)**로 즉시 전환합니다. 센서 이름이 보이지 않으면 소스 빌드가 아니라 **케이블·설정 파일(4.1)**을 먼저 확인합니다.
+> **이 과정의 카메라 주의 —** apt로 설치되는 libcamera는 **원본(upstream) 판**입니다. Camera Module 3(IMX708)을 RPi5에서 처리하는 Raspberry Pi 전용 구성 요소가 없어 `cam -l`의 빈 목록 또는 카메라 노드의 `no cameras available`이 출력되는 사례가 일관되게 보고되어 있습니다. 따라서 **4.1 인식 확인에서 `imx708`이 보이면 곧바로 Raspberry Pi판 libcamera 소스 빌드(10.1 — 20~40분)를 착수**합니다. `imx708`이 보이지 않으면 소스 빌드가 아니라 **케이블·설정 파일(4.1)**을 먼저 확인합니다.
 
 > **여기서 실패하면 이후 진행이 막힙니다 —** 카메라 스택이 구동되지 않으면 6장 이후가 전부 막힙니다. 소스 빌드도 실패하면 아래 **대체 경로**로 진행합니다.
 
@@ -481,7 +481,7 @@ ros2 run rqt_image_view rqt_image_view
 
 | 단계 | 확인 대상 | 명령 | 정상 |
 |:--:|------|------|------|
-| ① | 커널 인식 | `sudo dmesg \| grep -i -E "imx\|ov5647"` | 센서 이름 출력 |
+| ① | 커널 인식 | `sudo dmesg \| grep -i imx708` | `imx708` 출력 |
 | ② | libcamera 인식 | `cam -l` | 카메라 모델명 출력 |
 | ③ | 토픽 발행 | `ros2 topic hz /camera/image_raw` | 약 30Hz |
 | ④ | 영상 | `rqt_image_view` → `/camera/image_raw` | 영상 표시 |
@@ -881,8 +881,8 @@ self.pub.publish(twist)
 
 | 증상 | 원인 | 조치 |
 |------|------|------|
-| `dmesg`에 센서 이름이 없음 | 15핀 케이블 사용 · 케이블 방향 반대 · 클립 접촉 불량 · 자동 인식 실패 | 전원을 끄고 4.1 절차로 재연결 → 그래도 없으면 4.1 설정 파일 확인·재부팅 |
-| 센서 이름은 보이는데 `cam -l` 빈 목록 · 카메라 노드가 `no cameras available` 출력 | apt 원본 판 libcamera — RPi5 카메라 처리 구성 요소 없음 | 10.1 Raspberry Pi판 libcamera 소스 빌드 |
+| `dmesg`에 `imx708`이 없음 | 15핀 케이블 사용 · 케이블 방향 반대 · 클립 접촉 불량 · 자동 인식 실패 | 전원을 끄고 4.1 절차로 재연결 → 그래도 없으면 4.1 설정 파일 확인·재부팅 |
+| `imx708`은 보이는데 `cam -l` 빈 목록 · 카메라 노드가 `no cameras available` 출력 | apt 원본 판 libcamera — RPi5 카메라 처리 구성 요소 없음 | 10.1 Raspberry Pi판 libcamera 소스 빌드 |
 | 소스 빌드 후에도 인식되지 않음 | 사용자 권한 · 카메라 모델별 설정 | `groups`에 `video`가 없으면 `sudo usermod -aG video $USER` 후 재로그인 · 모델명을 교수에게 알림 |
 | `ros2 pkg list`에 `camera_ros`가 없음 | apt 패키지 미설치·미제공 | 5.1 재설치 → 실패 시 10.1 소스 빌드 |
 | `/camera/image_raw`가 목록에 없음 | 카메라 노드 미실행 · 다른 터미널의 `ROS_DOMAIN_ID` 불일치 | `ros2 node list`로 노드 확인 → `echo $ROS_DOMAIN_ID` 대조 |
@@ -908,7 +908,7 @@ self.pub.publish(twist)
 
 ### 10.1 카메라 스택 소스 빌드
 
-5.1의 apt 설치로 카메라가 인식되지 않을 때 실행하는 **조건부 경로**입니다. **Raspberry Pi판 libcamera와 `camera_ros`를 소스에서 함께 빌드**합니다. RPi5 + Ubuntu 24.04에서는 이 경로가 필요한 경우가 많습니다(5.1).
+**Raspberry Pi판 libcamera와 `camera_ros`를 소스에서 함께 빌드**합니다. 이 과정의 카메라(Camera Module 3 Wide · RPi5 · Ubuntu 24.04)는 apt 설치로 인식되지 않을 가능성이 높아 **이 절을 기본 경로로 실행**합니다(5.1).
 
 ```bash
 # 1) 빌드 도구
@@ -969,7 +969,7 @@ ros2 bag play run1                              # 재생 — 카메라 없이 �
 | 항목 | 내용 |
 |------|------|
 | 환경 전환 | **오늘부터 RPi5** — 카메라가 CSI 방식이라 PC 불가. 원격 연결(원격 데스크톱·SSH) + 작업물 이동(`git`·`scp`) → 재빌드 |
-| 카메라 | CSI 연결(전원 차단 상태) → `libcamera` → `camera_ros` → `/camera/image_raw` 발행 |
+| 카메라 | Camera Module 3 Wide를 CSI 연결(전원 차단 상태) → Raspberry Pi판 `libcamera`(소스 빌드) → `camera_ros` → `/camera/image_raw` 발행 |
 | 이미지 토픽 | `sensor_msgs/msg/Image` — Header + **배열형 `data`**. 640×480 컬러 ≈ **0.9MB/장**, `Twist`의 약 2만 배 |
 | 좌표계 | **영상 x는 오른쪽(+) / 로봇 회전 양수는 반시계** — **부호 반전 필수** |
 | 영상 처리 | BGR → **HSV** → 마스킹 → 열림(모폴로지) → 무게중심. HSV를 쓰는 이유 = **조명이 바뀌어도 H가 유지** |
