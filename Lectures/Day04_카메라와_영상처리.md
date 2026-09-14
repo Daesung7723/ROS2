@@ -17,7 +17,7 @@
 7. [실습 ③ — 색상 검출 노드](#7-실습--색상-검출-노드)
 8. [미니프로젝트 — 라인 인식](#8-미니프로젝트--라인-인식)
 9. [문제 해결 — 카메라·검출 진단](#9-문제-해결--카메라검출-진단)
-10. [대응 경로 — 카메라 스택 소스 빌드와 영상 대체](#10-대응-경로--카메라-스택-소스-빌드와-영상-대체)
+10. [대응 경로 — 카메라 없이 진행하기](#10-대응-경로--카메라-없이-진행하기)
 11. [오늘의 요약](#11-오늘의-요약)
 12. [다음 시간](#12-다음-시간)
 
@@ -297,7 +297,7 @@ ls /dev/media* /dev/video*             # 카메라 장치 파일 생성 확인
 ```
 
 - 카메라는 저장 장치가 아니므로 마운트 작업이 없음 — 드라이버가 인식하면 장치 파일이 자동으로 생성됨
-- 이 명령은 5.3 **카메라 동작 확인 5단계**의 1단계 — 2단계부터는 10.1 소스 빌드 후 수행
+- 이 명령은 5.3 **카메라 동작 확인 5단계**의 1단계 — 2단계부터는 5.1 소스 빌드 후 수행
 
 > **자주 하는 실수**
 >
@@ -394,40 +394,117 @@ Day 1 표준 좌표계에서 예고한 지점입니다.
 
 ## 5. 실습 ② — 카메라 노드 구동
 
-### 5.1 카메라 스택 준비
+### 5.1 카메라 스택 설치 — 소스 빌드
 
 RPi5의 CSI 카메라는 **libcamera**라는 라이브러리로 다룹니다. ROS2와 연결하는 패키지가 `camera_ros`입니다.
 
-```bash
-sudo apt update
-sudo apt install -y libcamera-dev libcamera-tools python3-libcamera
-sudo apt install -y ros-jazzy-camera-ros ros-jazzy-image-tools ros-jazzy-rqt-image-view
-```
+> **이 과정의 카메라 주의 —** apt로 설치되는 libcamera는 **원본(upstream) 판**입니다. Camera Module 3(IMX708)을 RPi5에서 처리하는 Raspberry Pi 전용 구성 요소가 없어 카메라 노드가 `no cameras available`을 출력합니다. 따라서 **Raspberry Pi판 libcamera와 `camera_ros`를 소스에서 빌드**합니다.
 
-- 이 과정의 카메라(Camera Module 3 Wide)는 **10.1 소스 빌드를 기본 경로**로 함 — 아래 주의 참조
-- 설치가 진행되는 동안 4·6장 이론을 읽어 둡니다
+| 구성 | 역할 |
+|------|------|
+| `raspberrypi/libcamera` | RPi5 카메라 처리 구성 요소를 포함한 libcamera — apt 원본 판을 대신함 |
+| `camera_ros` | libcamera 영상을 `/camera/image_raw` 토픽으로 발행 |
 
-**설치 확인**:
+설치 순서:
 
-```bash
-ros2 pkg list | grep camera           # camera_ros 등록 확인
-```
-
-- 카메라 동작 확인은 10.1 소스 빌드 후 5.3 **5단계**로 수행
-
-> **이 과정의 카메라 주의 —** apt로 설치되는 libcamera는 **원본(upstream) 판**입니다. Camera Module 3(IMX708)을 RPi5에서 처리하는 Raspberry Pi 전용 구성 요소가 없어 `cam -l`의 빈 목록 또는 카메라 노드의 `no cameras available`이 출력되는 사례가 일관되게 보고되어 있습니다. 따라서 **4.1 인식 확인에서 `imx708`이 보이면 곧바로 Raspberry Pi판 libcamera 소스 빌드(10.1 — 약 10~20분)를 착수**합니다. `imx708`이 보이지 않으면 소스 빌드가 아니라 **케이블·설정 파일(4.1)**을 먼저 확인합니다.
-
-> **여기서 실패하면 이후 진행이 막힙니다 —** 카메라 스택이 구동되지 않으면 6장 이후가 전부 막힙니다. 소스 빌드도 실패하면 아래 **대체 경로**로 진행합니다.
-
-**대체 경로** — 카메라가 구동되지 않은 학생도 6~8장을 진행합니다.
-
-| 경로 | 방법 |
+| 순서 | 내용 |
 |:--:|------|
-| ⓐ **다른 기기의 영상 구독** | 카메라가 정상인 학생의 기기에서 **카메라 노드만** 실행 → **같은 `ROS_DOMAIN_ID`면 자기 기기에서 그 토픽을 구독**(Day 1). 기기를 공용으로 쓰는 것이 아니라 **각자 자기 노드를 자기 기기에서 작성·실행** |
-| ⓑ **저장 영상** | 미리 기록한 `ros2 bag`을 재생(10.2) — 카메라 없이 `/camera/image_raw`가 발행됨 |
-| ⓒ 이미지 파일 | OpenCV로 정지 영상을 읽어 처리 — ROS2 없이 6장 개념만 확인 |
+| ① 준비 | 커널 인식 확인 · 영상 확인 도구 설치 · 작업 공간 만들기 · 소스 내려받기 |
+| ② 의존성 설치 | `rosdep`으로 camera_ros가 사용하는 ROS 패키지 설치 |
+| ③ 필수 패키지 설치 | libcamera 빌드 도구·라이브러리 설치 |
+| ④ 빌드 | `colcon build` — 약 10~20분(실측 10분 38초) |
+| ⑤ 빌드 후 확인 | 환경 등록 · 실행 경로 확인 · 카메라 노드 실행 |
 
-- **ⓐ가 가장 권장** — **노드가 여러 기기에 흩어져도 같은 도메인이면 연결된다**는 것의 실증이며, 오늘 배운 내용이 그대로 쓰임
+- ④ 빌드가 진행되는 동안 4·6장 이론을 읽어 둡니다
+
+**① 준비**
+
+```bash
+sudo dmesg | grep -i imx708                  # imx708이 보여야 시작 — 없으면 4.1 케이블·설정 파일
+sudo apt update
+sudo apt install -y git ros-jazzy-rqt-image-view ros-jazzy-image-tools   # 영상 확인 도구
+source /opt/ros/jazzy/setup.bash
+mkdir -p ~/camera_ws/src && cd ~/camera_ws/src
+git clone https://github.com/raspberrypi/libcamera.git
+git clone https://github.com/christianrauch/camera_ros.git
+```
+
+- apt판 `ros-jazzy-camera-ros`·`libcamera-tools`는 설치하지 않음 — 이미 설치했다면 `sudo apt remove ros-jazzy-camera-ros libcamera-tools`로 제거(빌드한 판과 혼동 방지)
+- `~/camera_ws`는 `~/ros2_ws`와 분리한 작업 공간 — 이후 `~/ros2_ws` 빌드 때 libcamera를 다시 빌드하지 않음
+
+**② 의존성 설치**
+
+```bash
+source /opt/ros/jazzy/setup.bash
+cd ~/camera_ws
+rosdep install -y --from-paths src --ignore-src --rosdistro jazzy --skip-keys=libcamera
+```
+
+- `--skip-keys=libcamera` = apt의 libcamera를 설치하지 않고 ①에서 내려받은 소스를 사용
+
+| 오류 | 조치 |
+|------|------|
+| `rosdep: command not found` | `sudo apt install -y python3-rosdep` |
+| 소스 목록(`sources list`) 오류 | `sudo rosdep init` → `rosdep update`(최초 1회) |
+
+**③ 필수 패키지 설치** — ② 이후에도 libcamera 빌드 도구는 빠져 있을 수 있어 직접 설치합니다
+
+```bash
+sudo apt install -y python3-colcon-meson meson ninja-build pkg-config \
+  libyaml-dev python3-yaml python3-ply python3-jinja2 \
+  libssl-dev libevent-dev libudev-dev
+```
+
+| 패키지 | 용도 |
+|------|------|
+| `python3-colcon-meson` · `meson` · `ninja-build` · `pkg-config` | 빌드 도구 |
+| `libyaml-dev` · `python3-yaml` · `python3-ply` · `python3-jinja2` | libcamera 필수 라이브러리 |
+| `libssl-dev` · `libevent-dev` · `libudev-dev` | 모듈 서명 · `cam` 도구 · 장치 탐지 |
+
+- ⚠️ 이 단계를 빠뜨리면 ④ 빌드가 **수 초 만에 실패**(실측 — libcamera 12.4초)
+
+**④ 빌드**
+
+```bash
+cd ~/camera_ws
+colcon build --event-handlers=console_direct+
+```
+
+- RPi5에서 **약 10~20분**(실측 10분 38초)
+- 완료 확인 = 마지막 줄 `Summary: 2 packages finished`(libcamera·camera_ros)
+
+빌드가 실패하면:
+
+| 증상 | 조치 |
+|------|------|
+| libcamera가 수 초 만에 실패 | ③ 필수 패키지 설치 → 빌드 결과 삭제 후 재빌드(아래) |
+| 원인을 알 수 없음 | `~/camera_ws/log/latest_build/libcamera/stderr.log` 마지막 부분 확인 |
+
+```bash
+cd ~/camera_ws && rm -rf build install log    # 빌드 결과만 삭제 — src는 유지
+colcon build --event-handlers=console_direct+
+```
+
+- 특정 패키지만 다시 빌드하려면 `--packages-select <패키지명>`(Day 3 자료 10장)
+
+**⑤ 빌드 후 확인**
+
+```bash
+echo "source ~/camera_ws/install/setup.bash" >> ~/.bashrc   # 새 터미널에도 적용
+source ~/camera_ws/install/setup.bash
+ros2 pkg prefix camera_ros       # /home/<사용자>/camera_ws/install/camera_ros
+ros2 run camera_ros camera_node  # 로그에 0: imx708_wide
+```
+
+| 확인 | 정상 | 아니면 |
+|------|------|------|
+| 실행 경로 | `camera_ws` 경로 | `/opt/ros/jazzy` → `source` 재실행 · apt판 제거 |
+| 노드 로그 | `0: imx708_wide` · `rpi/pisp` | `no cameras available` → 실행 경로 확인 |
+
+- `/opt/ros/jazzy`가 나오면 apt판 camera_ros가 실행되는 상태 — 원본 판 libcamera를 사용해 이 카메라를 인식하지 못함
+- 이어서 5.2 실행 로그 읽기 → 5.3 **카메라 동작 확인 5단계**(2~5단계)로 진행
+
+> **여기서 실패하면 이후 진행이 막힙니다 —** 카메라 스택이 구동되지 않으면 6장 이후가 전부 막힙니다. 소스 빌드 후에도 카메라가 구동되지 않으면 **10장 대응 경로**(카메라 없이 진행)로 넘어갑니다.
 
 ### 5.2 카메라 노드 실행
 
@@ -499,10 +576,10 @@ ros2 run rqt_image_view rqt_image_view
 | 4 | 영상 토픽 발행 | `ros2 topic hz /camera/image_raw` | 약 30Hz |
 | 5 | 최종 검증 | `rqt_image_view` → `/camera/image_raw` | 영상 표시 · 카메라 앞 움직임이 화면에 즉시 반영 |
 
-- 1 실패 = 케이블·설정 파일(4.1) / 2 실패 = libcamera 빌드(10.1) / 3 실패 = `ros2 pkg prefix camera_ros`로 apt판 여부 확인(10.1) / 4 실패 = 노드 종료·`ROS_DOMAIN_ID` 불일치 / 5 실패 = 원격 데스크톱 연결(3.2)
+- 1 실패 = 케이블·설정 파일(4.1) / 2 실패 = libcamera 빌드(5.1 ④) / 3 실패 = `ros2 pkg prefix camera_ros`로 apt판 여부 확인(5.1 ⑤) / 4 실패 = 노드 종료·`ROS_DOMAIN_ID` 불일치 / 5 실패 = 원격 데스크톱 연결(3.2)
 - 이미지 토픽은 `topic echo`로 출력하지 않습니다 — 픽셀 값 배열이 화면을 채웁니다
 
-2단계 — ROS 없이 카메라 확인 (10.1 소스 빌드 완료 후):
+2단계 — ROS 없이 카메라 확인 (5.1 소스 빌드 완료 후):
 
 ```bash
 CAM=~/camera_ws/install/libcamera/bin/cam                              # 빌드한 판의 cam — 전체 경로로 지정
@@ -909,10 +986,10 @@ self.pub.publish(twist)
 | 증상 | 원인 | 조치 |
 |------|------|------|
 | `dmesg`에 `imx708`이 없음 | 15핀 케이블 사용 · 케이블 방향 반대 · 클립 접촉 불량 · 자동 인식 실패 | 전원을 끄고 4.1 절차로 재연결 → 그래도 없으면 4.1 설정 파일 확인·재부팅 |
-| `imx708`은 보이는데 카메라 노드가 `no cameras available` 출력 | apt판 camera_ros·libcamera 실행 중 — `ros2 pkg prefix camera_ros`가 `/opt/ros/jazzy` | 10.1 Raspberry Pi판 libcamera 소스 빌드 → `source ~/camera_ws/install/setup.bash` |
+| `imx708`은 보이는데 카메라 노드가 `no cameras available` 출력 | apt판 camera_ros·libcamera 실행 중 — `ros2 pkg prefix camera_ros`가 `/opt/ros/jazzy` | 5.1 소스 빌드 → ⑤ `source ~/camera_ws/install/setup.bash` |
 | `cam -l` 빈 목록 · 로그에 `libcamera v0.2.0` | apt판 `cam`(`/usr/bin/cam`)이 실행됨 — 카메라 문제 아님 | 빌드한 판 `~/camera_ws/install/libcamera/bin/cam -l` 실행 |
 | 소스 빌드 후에도 인식되지 않음 | 사용자 권한 · 커넥터 설정 | `groups`에 `video`가 없으면 `sudo usermod -aG video $USER` 후 재로그인 · `config.txt`의 `cam0`·`cam1` 확인 |
-| `ros2 pkg list`에 `camera_ros`가 없음 | apt 패키지 미설치·미제공 | 5.1 재설치 → 실패 시 10.1 소스 빌드 |
+| `ros2 pkg list`에 `camera_ros`가 없음 | 소스 빌드 미완료 · 환경 미등록 | 5.1 ④ 빌드 → ⑤ `source ~/camera_ws/install/setup.bash` |
 | `/camera/image_raw`가 목록에 없음 | 카메라 노드 미실행 · 다른 터미널의 `ROS_DOMAIN_ID` 불일치 | `ros2 node list`로 노드 확인 → `echo $ROS_DOMAIN_ID` 대조 |
 | 영상 창이 끊기거나 느림 | 원격 데스크톱 대역폭 | 해상도 640×480으로 낮춤(5.2) |
 | `topic echo /camera/image_raw`로 화면이 숫자로 뒤덮임 | 이미지 토픽을 텍스트로 출력 | `Ctrl+C` → `rqt_image_view` 사용 |
@@ -932,66 +1009,29 @@ self.pub.publish(twist)
 
 ---
 
-## 10. 대응 경로 — 카메라 스택 소스 빌드와 영상 대체
+## 10. 대응 경로 — 카메라 없이 진행하기
 
-### 10.1 카메라 스택 소스 빌드
+5.1 소스 빌드 후에도 카메라가 구동되지 않을 때 사용합니다. 실패에 대비해 별도 경로를 준비해 두는 같은 방식을 Day 8 결선·Day 9 실물 전환에서도 사용합니다.
 
-**Raspberry Pi판 libcamera와 `camera_ros`를 소스에서 함께 빌드**합니다. 이 과정의 카메라(Camera Module 3 Wide · RPi5 · Ubuntu 24.04)는 apt 설치로 인식되지 않을 가능성이 높아 **이 절을 기본 경로로 실행**합니다(5.1).
+그래도 인식되지 않으면 — 마지막 확인:
 
-```bash
-# 1) 빌드 도구·필수 패키지 — 빠지면 libcamera 설정 단계에서 수 초 만에 실패
-sudo apt install -y python3-colcon-meson meson ninja-build pkg-config \
-  libyaml-dev python3-yaml python3-ply python3-jinja2 \
-  libssl-dev libevent-dev libudev-dev
-
-# 2) 카메라 전용 작업 공간에 두 저장소를 내려받기
-mkdir -p ~/camera_ws/src && cd ~/camera_ws/src
-git clone https://github.com/raspberrypi/libcamera.git
-git clone https://github.com/christianrauch/camera_ros.git
-
-# 3) 의존성 설치 — libcamera는 내려받은 소스를 사용하므로 제외
-source /opt/ros/jazzy/setup.bash
-cd ~/camera_ws
-rosdep install -y --from-paths src --ignore-src --rosdistro jazzy --skip-keys=libcamera
-
-# 4) 빌드
-colcon build --event-handlers=console_direct+
-```
-
-빌드 후 등록과 확인:
-
-```bash
-echo "source ~/camera_ws/install/setup.bash" >> ~/.bashrc
-source ~/camera_ws/install/setup.bash
-ros2 pkg prefix camera_ros            # /home/<사용자>/camera_ws/install/camera_ros 가 나와야 함
-ros2 run camera_ros camera_node       # no cameras available이 출력되지 않으면 정상
-```
-
-| 구성 | 역할 |
+| 확인 | 조치 |
 |------|------|
-| `raspberrypi/libcamera` | RPi5 카메라 처리 구성 요소를 포함한 libcamera — apt 원본 판을 대신함 |
-| `camera_ros` | libcamera 영상을 `/camera/image_raw` 토픽으로 발행 |
-| `--skip-keys=libcamera` | apt의 libcamera를 설치하지 않도록 의존성 목록에서 제외 |
-| `~/camera_ws` | `~/ros2_ws`와 분리한 작업 공간 — 이후 `~/ros2_ws` 빌드 때 libcamera를 다시 빌드하지 않음 |
+| 케이블·설정 파일 | 변환 케이블 규격·연결 상태·`config.txt` 설정 확인(4.1) |
+| 사용자 권한 | `groups` 출력에 `video`가 없으면 `sudo usermod -aG video $USER` 실행 후 재로그인 |
+| 커넥터 번호 | `config.txt`의 `cam0`·`cam1`이 실제로 꽂은 커넥터(`CAM/DISP0`·`CAM/DISP1`)와 일치하는지 확인 |
 
-- RPi5에서 **약 10~20분**(실측 1대 10분 38초) — 빌드가 진행되는 동안 4·6장 이론을 읽어 둡니다
-- 완료 확인 = 마지막 줄 `Summary: 2 packages finished`(libcamera·camera_ros)
-- 이후 확인은 5.3 **카메라 동작 확인 5단계**의 2~5단계로 수행
-- 빌드가 중간에 실패하면 오류가 난 패키지를 확인하고 `--packages-select`로 해당 패키지만 재시도(Day 3 자료 10장)
-- 그래도 인식되지 않으면 9장 카메라·토픽 표의 권한·커넥터 항목을 확인
+대체 경로 — 카메라가 구동되지 않은 학생도 6~8장을 진행합니다.
 
-빌드가 실패하거나 `no cameras available`이 나오면:
+| 경로 | 방법 |
+|:--:|------|
+| ⓐ **다른 기기의 영상 구독** | 카메라가 정상인 학생의 기기에서 **카메라 노드만** 실행 → **같은 `ROS_DOMAIN_ID`면 자기 기기에서 그 토픽을 구독**(Day 1). 기기를 공용으로 쓰는 것이 아니라 **각자 자기 노드를 자기 기기에서 작성·실행** |
+| ⓑ **저장 영상** | 미리 기록한 `ros2 bag`을 재생(10.1) — 카메라 없이 `/camera/image_raw`가 발행됨 |
+| ⓒ 이미지 파일 | OpenCV로 정지 영상을 읽어 처리 — ROS2 없이 6장 개념만 확인 |
 
-| 증상 | 조치 |
-|------|------|
-| libcamera가 수 초 만에 실패(`0 packages finished`) | 1)의 필수 패키지 설치 확인 → `cd ~/camera_ws && rm -rf build install log` 후 다시 빌드(`src`는 유지) |
-| `rosdep: command not found` | `sudo apt install -y python3-rosdep` |
-| rosdep 소스 목록 오류 | `sudo rosdep init` → `rosdep update`(최초 1회) |
-| 원인을 알 수 없음 | `cat ~/camera_ws/log/latest_build/libcamera/stderr.log`의 마지막 부분 확인 |
-| `no cameras available` | `ros2 pkg prefix camera_ros`가 `/opt/ros/jazzy`면 **apt판 camera_ros 실행 중** → `source ~/camera_ws/install/setup.bash` 후 재확인 · 계속되면 `sudo apt remove ros-jazzy-camera-ros` |
-- 실패에 대비해 별도 경로를 준비해 두는 같은 방식을 Day 8 결선·Day 9 실물 전환에서도 사용합니다
+- **ⓐ가 가장 권장** — **노드가 여러 기기에 흩어져도 같은 도메인이면 연결된다**는 것의 실증이며, 오늘 배운 내용이 그대로 쓰임
 
-### 10.2 영상 저장과 재생 — 대체 경로 ⓑ
+### 10.1 영상 저장과 재생 — 대체 경로 ⓑ
 
 카메라 없이 `/camera/image_raw`를 발행하려면 미리 기록한 파일을 재생합니다.
 
