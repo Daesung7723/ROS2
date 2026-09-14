@@ -1125,7 +1125,7 @@ Day 4부터 **실행 환경이 Raspberry Pi 5로 바뀝니다.** 카메라가 CS
 | ② | 초기 설정 — 사용자·네트워크 → `sudo apt update && sudo apt upgrade` | 네트워크 연결 |
 | ③ | **ROS2 Jazzy 설치** — Day 1과 같은 단계 + **빌드 도구 colcon**(3.0의 설치 명령) | 설치 오류 없음 · `which colcon` 출력 확인 |
 | ④ | 환경 등록 — `.bashrc`에 `source /opt/ros/jazzy/setup.bash` + `ROS_DOMAIN_ID` | 새 터미널에서 `ros2` 인식 |
-| ⑤ | **원격 연결** — `openssh-server` 설치 + 설정 → 공유 → 원격 데스크톱 켬 | PC에서 연결됨 |
+| ⑤ | **원격 연결** — `openssh-server` 설치 + 원격 데스크톱 켬(설정 → 시스템) | PC에서 원격 데스크톱 연결로 접속 |
 | ⑥ | 완료 확인 — 11.3의 명령 4종 | 4개 모두 정상 |
 
 - ③은 **Day 1에서 수행한 것과 같은 절차**입니다 — 그때의 필기를 그대로 참조합니다
@@ -1147,9 +1147,11 @@ ros2 topic list         # /parameter_events·/rosout 표시
 
 | 확인 | 정상 |
 |------|------|
-| VNC(Virtual Network Computing) 뷰어로 연결 | RPi5 바탕화면이 PC 화면에 표시 |
+| PC의 **원격 데스크톱 연결**(RDP, Remote Desktop Protocol)로 접속 | RPi5 바탕화면이 PC 화면에 표시 |
 | `ssh 사용자명@주소` | 터미널 연결 |
 | RPi5에서 `hostname -I` | 주소 출력 — **메모해 둘 것** |
+
+- 원격 데스크톱 접속 이름·암호 = RPi5 원격 데스크톱 설정에 표시된 값(Ubuntu 로그인 계정과 별도 — 상세 Day 4 자료 3.2)
 
 - **주소는 재부팅하면 바뀔 수 있습니다** — 연결이 되지 않으면 주소부터 다시 확인합니다
 - 이 네 명령은 **Day 4 첫 점검에서 그대로 다시 실행**합니다
