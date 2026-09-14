@@ -263,8 +263,10 @@ ros2 run turtlesim turtlesim_node
 3. 클립을 눌러 고정 → 전원 인가·부팅
 
 ```bash
-libcamera-hello --list-cameras        # 인식 확인 — 모델명이 출력되면 정상
+cam -l                                # 인식 확인 — 카메라 모델명이 출력되면 정상
 ```
+
+- `cam`은 5.1에서 설치하는 `libcamera-tools`에 포함된 확인 도구 — 설치 명령 실행 후 사용
 
 > **자주 하는 실수**
 >
@@ -354,11 +356,13 @@ sudo apt install -y ros-jazzy-camera-ros ros-jazzy-image-tools ros-jazzy-rqt-ima
 **설치 확인**:
 
 ```bash
-libcamera-hello -t 2000               # 2초간 미리보기 창 — 카메라 자체 확인
+cam -l                                # 카메라 인식 확인 — 모델명이 출력되면 정상
 ros2 pkg list | grep camera           # camera_ros 등록 확인
 ```
 
-> **여기서 실패하면 이후 진행이 막힙니다 —** 카메라 스택이 구동되지 않으면 6장 이후가 전부 막힙니다. apt 설치가 실패하면 **소스 빌드(10.1 — 20~40분)**로 전환하고, 그래도 실패하면 **대체 경로(10.2)**로 진행합니다.
+> **RPi5 + Ubuntu 24.04 주의 —** apt로 설치되는 libcamera는 **원본(upstream) 판**이며, RPi5 카메라 처리에 필요한 Raspberry Pi 전용 구성 요소가 포함되지 않은 경우가 많습니다. 증상은 `cam -l`의 빈 목록 또는 카메라 노드의 `no cameras available` 출력입니다. 케이블 연결(4.1)을 확인했는데도 목록이 비어 있으면 **Raspberry Pi판 libcamera 소스 빌드(10.1 — 20~40분)**로 즉시 전환합니다.
+
+> **여기서 실패하면 이후 진행이 막힙니다 —** 카메라 스택이 구동되지 않으면 6장 이후가 전부 막힙니다. 소스 빌드도 실패하면 아래 **대체 경로**로 진행합니다.
 
 **대체 경로** — 카메라가 구동되지 않은 학생도 6~8장을 진행합니다.
 
@@ -416,6 +420,19 @@ ros2 run rqt_image_view rqt_image_view
 > **Tip —** 영상이 끊기거나 지연이 크면 **해상도를 먼저 낮춥니다.** VNC는 화면 전체를 네트워크로 보내므로, 영상 창이 크면 그만큼 느려집니다.
 
 - 확인 지점 — **카메라 → 토픽 → 뷰어**의 경로가 성립. 이 사이에 우리 노드를 끼워 넣는 것이 7장
+
+**정상 동작 확인 — 3단계**
+
+앞 단계가 성립해야 다음 단계를 확인할 수 있습니다. 확인이 멈춘 단계가 원인의 위치입니다.
+
+| 단계 | 확인 대상 | 명령 | 정상 |
+|:--:|------|------|------|
+| ① | 카메라 인식 | `cam -l` | 카메라 모델명 출력 |
+| ② | 토픽 발행 | `ros2 topic hz /camera/image_raw` | 약 30Hz |
+| ③ | 영상 | `rqt_image_view` → `/camera/image_raw` | 영상 표시 |
+
+- ① 실패 = 케이블 연결(4.1) 또는 libcamera 판(10.1) / ② 실패 = 카메라 노드 미실행·`ROS_DOMAIN_ID` 불일치 / ③ 실패 = VNC 연결(3.2)
+- 이미지 토픽은 `topic echo`로 출력하지 않습니다 — 픽셀 값 배열이 화면을 채웁니다
 
 ---
 
@@ -809,7 +826,9 @@ self.pub.publish(twist)
 
 | 증상 | 원인 | 조치 |
 |------|------|------|
-| `libcamera-hello --list-cameras`에 모델명이 없음 | 케이블 방향 반대 · 클립 접촉 불량 | 전원을 끄고 4.1 절차로 재연결 |
+| `cam -l`에 모델명이 없음 | 케이블 방향 반대 · 클립 접촉 불량 | 전원을 끄고 4.1 절차로 재연결 |
+| 케이블이 정상인데도 `cam -l` 빈 목록 · 카메라 노드가 `no cameras available` 출력 | apt 원본 판 libcamera — RPi5 카메라 처리 구성 요소 없음 | 10.1 Raspberry Pi판 libcamera 소스 빌드 |
+| 소스 빌드 후에도 인식되지 않음 | 사용자 권한 · 카메라 모델별 설정 | `groups`에 `video`가 없으면 `sudo usermod -aG video $USER` 후 재로그인 · 모델명을 교수에게 알림 |
 | `ros2 pkg list`에 `camera_ros`가 없음 | apt 패키지 미설치·미제공 | 5.1 재설치 → 실패 시 10.1 소스 빌드 |
 | `/camera/image_raw`가 목록에 없음 | 카메라 노드 미실행 · 다른 터미널의 `ROS_DOMAIN_ID` 불일치 | `ros2 node list`로 노드 확인 → `echo $ROS_DOMAIN_ID` 대조 |
 | 영상 창이 끊기거나 느림 | VNC 대역폭 | 해상도 640×480으로 낮춤(5.2) |
@@ -826,7 +845,7 @@ self.pub.publish(twist)
 | `ModuleNotFoundError: cv2` 또는 `cv_bridge` | 패키지 미설치 | 7.1 설치 명령 재실행 · `package.xml`에 `<depend>cv_bridge</depend>` 추가 |
 | `IndexError` 또는 슬라이스 오류 | `int()` 없이 실수 인덱스 사용 | 8.2 자주 하는 실수 |
 
-- 진단의 기본 순서 = **카메라 자체(`libcamera-hello`) → 토픽(`topic hz`) → 마스크(7.5) → 좌표(`topic echo /target_point`)** — 앞에서 뒤로 한 단계씩 확인합니다
+- 진단의 기본 순서 = **카메라 자체(`cam -l`) → 토픽(`topic hz`) → 마스크(7.5) → 좌표(`topic echo /target_point`)** — 앞에서 뒤로 한 단계씩 확인합니다
 
 ---
 
@@ -834,19 +853,45 @@ self.pub.publish(twist)
 
 ### 10.1 카메라 스택 소스 빌드
 
-5.1의 apt 설치가 실패한 경우에 실행하는 **조건부 경로**입니다. 배포 패키지가 동작하지 않을 때 소스에서 직접 빌드합니다.
+5.1의 apt 설치로 카메라가 인식되지 않을 때 실행하는 **조건부 경로**입니다. **Raspberry Pi판 libcamera와 `camera_ros`를 소스에서 함께 빌드**합니다. RPi5 + Ubuntu 24.04에서는 이 경로가 필요한 경우가 많습니다(5.1).
 
 ```bash
-sudo apt install -y python3-colcon-meson libcamera-dev
-cd ~/ros2_ws/src
+# 1) 빌드 도구
+sudo apt install -y python3-colcon-meson
+
+# 2) 카메라 전용 작업 공간에 두 저장소를 내려받기
+mkdir -p ~/camera_ws/src && cd ~/camera_ws/src
+git clone https://github.com/raspberrypi/libcamera.git
 git clone https://github.com/christianrauch/camera_ros.git
-cd ~/ros2_ws
-rosdep install -i --from-path src --rosdistro jazzy -y
-colcon build --packages-select camera_ros
+
+# 3) 의존성 설치 — libcamera는 내려받은 소스를 사용하므로 제외
+source /opt/ros/jazzy/setup.bash
+cd ~/camera_ws
+rosdep install -y --from-paths src --ignore-src --rosdistro jazzy --skip-keys=libcamera
+
+# 4) 빌드
+colcon build --event-handlers=console_direct+
 ```
 
+빌드 후 등록과 확인:
+
+```bash
+echo "source ~/camera_ws/install/setup.bash" >> ~/.bashrc
+source ~/camera_ws/install/setup.bash
+ros2 run camera_ros camera_node       # no cameras available이 출력되지 않으면 정상
+```
+
+| 구성 | 역할 |
+|------|------|
+| `raspberrypi/libcamera` | RPi5 카메라 처리 구성 요소를 포함한 libcamera — apt 원본 판을 대신함 |
+| `camera_ros` | libcamera 영상을 `/camera/image_raw` 토픽으로 발행 |
+| `--skip-keys=libcamera` | apt의 libcamera를 설치하지 않도록 의존성 목록에서 제외 |
+| `~/camera_ws` | `~/ros2_ws`와 분리한 작업 공간 — 이후 `~/ros2_ws` 빌드 때 libcamera를 다시 빌드하지 않음 |
+
 - RPi5에서 **20~40분** 소요 — 빌드가 진행되는 동안 4·6장 이론을 읽어 둡니다
-- 빌드 실패 시 `--packages-select`로 해당 패키지만 재시도(Day 3 자료 10장)
+- 이후 확인은 5.3 3단계 ②③으로 수행
+- 빌드가 중간에 실패하면 오류가 난 패키지를 확인하고 `--packages-select`로 해당 패키지만 재시도(Day 3 자료 10장)
+- 그래도 인식되지 않으면 9장 카메라·토픽 표의 권한·모델 항목을 확인
 - 실패에 대비해 별도 경로를 준비해 두는 같은 방식을 Day 8 결선·Day 9 실물 전환에서도 사용합니다
 
 ### 10.2 영상 저장과 재생 — 대체 경로 ⓑ
