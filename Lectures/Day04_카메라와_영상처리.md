@@ -16,10 +16,9 @@
 6. [영상 처리의 기초](#6-영상-처리의-기초)
 7. [실습 ③ — 색상 검출 노드](#7-실습--색상-검출-노드)
 8. [미니프로젝트 — 라인 인식](#8-미니프로젝트--라인-인식)
-9. [문제 해결 — 카메라·검출 진단](#9-문제-해결--카메라검출-진단)
-10. [대응 경로 — 카메라 없이 진행하기](#10-대응-경로--카메라-없이-진행하기)
-11. [오늘의 요약](#11-오늘의-요약)
-12. [다음 시간](#12-다음-시간)
+9. [대응 경로 — 카메라 없이 진행하기](#9-대응-경로--카메라-없이-진행하기)
+10. [오늘의 요약](#10-오늘의-요약)
+11. [다음 시간](#11-다음-시간)
 
 ---
 
@@ -135,7 +134,7 @@ Day 1~3은 강의실 PC의 WSL2에서 진행했습니다. 오늘부터 RPi5로 �
 |------|------|
 | 환경 등록 누락 등 경미 | 즉시 복구 후 정상 경로 |
 | 재설치 필요 | **구축을 각자 이어서 진행** — 설치가 진행되는 동안 4·6장 이론에는 동일하게 참여 |
-| 카메라를 구동하지 못함 | **Day 1~3의 PC 환경(WSL2)에서 7장 코드 작성** — 영상 입력만 `ros2 bag` 재생 또는 이미지 파일로 대체(10장) |
+| 카메라를 구동하지 못함 | **Day 1~3의 PC 환경(WSL2)에서 7장 코드 작성** — 영상 입력만 `ros2 bag` 재생 또는 이미지 파일로 대체(9장) |
 
 > **오늘 놓치지 말아야 할 것 —** 카메라가 구동되지 않아도 **6장 영상 처리 원리와 7장 노드 코드는 그대로 학습**할 수 있습니다. 환경은 뒤에 복구하면 되지만, 오늘 다루는 처리 절차(HSV → 마스킹 → 무게중심)는 **Day 5·6의 전제**입니다.
 
@@ -155,7 +154,7 @@ Day 1~3은 강의실 PC의 WSL2에서 진행했습니다. 오늘부터 RPi5로 �
 
 > **핵심 —** 오늘 다루는 영상 확인 도구(`rqt_image_view`)는 창을 띄웁니다. SSH 터미널만으로는 영상이 보이지 않으므로 원격 데스크톱을 기본으로 합니다.
 
-확인 절차 — 강의실 PC에서:
+**확인 ① 원격 데스크톱 연결** — 강의실 PC에서:
 
 ```
 시작 메뉴 → "원격 데스크톱 연결" 실행 (또는 Win+R → mstsc)
@@ -163,12 +162,23 @@ Day 1~3은 강의실 PC의 WSL2에서 진행했습니다. 오늘부터 RPi5로 �
 → RPi5 원격 데스크톱 설정의 사용자 이름·암호 입력 → RPi5 바탕화면 표시
 ```
 
-| 확인 | 정상 |
-|------|------|
-| 원격 데스크톱 화면 표시 | 원격 데스크톱 설정 완료 |
-| `ssh 사용자명@주소` | SSH 서버 동작 |
+- RPi5 바탕화면이 보이면 → ②로 진행
+- 원격 데스크톱을 설정하지 않은 상태면 → 아래 **설정**을 수행한 뒤 **①을 다시** 실행
+- 연결 자체가 실패하면 → RPi5 주소(`hostname -I` — 재부팅하면 바뀔 수 있음)·같은 네트워크인지 확인 후 **①을 다시** 실행
+- 이름·암호 오류가 나오면 → Ubuntu 계정이 아니라 **원격 데스크톱 설정에 표시된** 이름·암호로 **①을 다시** 실행
+- 검은 화면이면 → Windows 기본 `mstsc` 사용·RPi5 로그인 상태·화면 잠금 해제 확인 후 **①을 다시** 실행
 
-미설정 상태라면 — 과제 안내(Day 3 자료 11장)의 절차를 지금 수행합니다(약 10분):
+**확인 ② SSH 연결**:
+
+```bash
+ssh 사용자명@192.168.0.__
+```
+
+- 암호 입력 후 RPi5 프롬프트가 나오면 → 3.3으로 진행
+- `Connection refused`가 나오면 SSH 서버가 없는 상태 → 아래 **설정**의 SSH 설치를 수행한 뒤 **②를 다시** 실행
+- 응답 없이 멈추면 → ①과 같이 주소·네트워크를 확인한 뒤 **②를 다시** 실행
+
+**설정 — 미설정 상태에서만** — 과제 안내(Day 3 자료 11장)의 절차를 지금 수행합니다(약 10분):
 
 ```bash
 sudo apt install openssh-server -y && sudo systemctl enable --now ssh
@@ -179,16 +189,7 @@ hostname -I                       # 주소 확인 — 메모할 것
 
 - 이 이름·암호는 **원격 연결 전용** — Ubuntu 로그인 계정과 별도로 설정됨
 - 데스크톱 공유는 **RPi5에서 현재 로그인된 화면**을 PC로 전송하는 방식 — RPi5를 로그인한 상태로 둠
-
-연결되지 않을 때:
-
-| 증상 | 확인 |
-|------|------|
-| 연결 자체가 실패 | RPi5 주소 재확인(`hostname -I`) · 데스크톱 공유 켜짐 · 같은 네트워크 |
-| 이름·암호 오류 | Ubuntu 계정이 아니라 **원격 데스크톱 설정에 표시된** 이름·암호 입력 |
-| 검은 화면 | Windows 기본 **원격 데스크톱 연결**(`mstsc`) 사용 · RPi5 로그인 상태·화면 잠금 해제 확인 |
-
-> **자주 하는 실수 —** RPi5의 주소는 재부팅하면 바뀔 수 있습니다. 연결이 갑자기 되지 않으면 주소부터 다시 확인하십시오.
+- 설정을 마치면 → 진행하던 **① 또는 ②로 돌아가** 다시 실행
 
 ### 3.3 작업물 옮기기
 
@@ -296,6 +297,9 @@ sudo dmesg | grep -i imx708            # imx708이 보이면 커널이 카메라
 ls /dev/media* /dev/video*             # 카메라 장치 파일 생성 확인
 ```
 
+- `imx708`이 포함된 줄이 나오면 → 4.2로 진행
+- 아무것도 나오지 않으면 → 전원을 끄고 연결 절차 1~3(케이블 규격·방향·클립)을 다시 확인 → 부팅 후 **인식 확인을 다시** 실행
+- 연결을 다시 확인해도 나오지 않으면 → 아래 **설정 파일 확인**으로 진행
 - 카메라는 저장 장치가 아니므로 마운트 작업이 없음 — 드라이버가 인식하면 장치 파일이 자동으로 생성됨
 - 이 명령은 5.3 **카메라 동작 확인 5단계**의 1단계 — 2단계부터는 5.1 소스 빌드 후 수행
 
@@ -306,7 +310,7 @@ ls /dev/media* /dev/video*             # 카메라 장치 파일 생성 확인
 > - **전원 인가 상태에서 착탈** — 모듈 손상 위험
 > - 클립을 덜 눌러 접촉 불량 — 흔들면 인식이 끊김
 
-`imx708`이 보이지 않으면 — 설정 파일 확인:
+**설정 파일 확인** — 인식 확인에서 넘어온 경우에만:
 
 ```bash
 grep camera /boot/firmware/config.txt   # 현재 카메라 설정 확인
@@ -325,8 +329,9 @@ dtoverlay=imx708,cam0
 | 센서명 | **이 과정 카메라(Camera Module 3 Wide) = `imx708`** — Wide 모델도 같은 이름 사용 |
 | 커넥터 | `CAM/DISP0` = `,cam0` · `CAM/DISP1` = `,cam1` |
 
-- 재부팅 후 위 인식 확인 명령을 다시 실행
 - `,cam0`을 생략하면 `CAM/DISP1` 커넥터를 찾음 — 실제로 꽂은 커넥터 번호에 맞춤
+- 재부팅 후 **인식 확인을 다시** 실행 → `imx708`이 나오면 4.2로 진행
+- 설정 후에도 나오지 않으면 → `cam0`·`cam1`이 실제로 꽂은 커넥터와 같은지 확인하고 재부팅 → 그래도 나오지 않으면 교수에게 알림
 
 ### 4.2 이미지 토픽의 구조
 
@@ -394,6 +399,40 @@ Day 1 표준 좌표계에서 예고한 지점입니다.
 
 ## 5. 실습 ② — 카메라 노드 구동
 
+진행 흐름 — 확인 결과가 맞지 않으면 화살표를 따라 돌아가 다시 실행합니다.
+
+```mermaid
+flowchart TD
+    S1["①-1 커널 인식 확인"] --> Q1{"imx708 출력"}
+    Q1 -->|아니요| F1["4.1 연결·설정 파일 확인 후 재부팅"]
+    F1 --> S1
+    Q1 -->|예| S2["①-2 영상 확인 도구 설치"]
+    S2 --> S3["①-3 소스 내려받기"]
+    S3 --> S4["②-1 rosdep 설치"]
+    S4 --> Q4{"rosdep2 충돌 오류"}
+    Q4 -->|예| F4["python3-rosdep2 제거"]
+    F4 --> S4
+    Q4 -->|아니요| S5["②-2 초기화 · ②-3 갱신 · ②-4 의존 패키지 설치"]
+    S5 --> S6["③ 필수 패키지 설치"]
+    S6 --> S7["④-1 colcon list"]
+    S7 --> Q7{"패키지 2개"}
+    Q7 -->|0개| S3
+    Q7 -->|camera_ros만| S6
+    Q7 -->|예| S8["④-2 빌드 (약 10~20분)"]
+    S8 --> Q8{"2 packages finished"}
+    Q8 -->|아니요| F8["③ 재실행 · 빌드 결과 삭제"]
+    F8 --> S8
+    Q8 -->|예| S9["⑤-1 환경 등록 · ⑤-2 실행 경로 확인"]
+    S9 --> Q9{"camera_ws 경로"}
+    Q9 -->|/opt/ros/jazzy| F9["apt판 제거 후 source"]
+    F9 --> S9
+    Q9 -->|예| S10["⑤-3 camera_node 실행"]
+    S10 --> Q10{"0: imx708_wide"}
+    Q10 -->|아니요| S9
+    Q10 -->|예| S11["5.2 토픽 발행 확인"]
+    S11 --> S12["5.3 rqt_image_view 영상 확인"]
+```
+
 ### 5.1 카메라 스택 설치 — 소스 빌드
 
 RPi5의 CSI 카메라는 **libcamera**라는 라이브러리로 다룹니다. ROS2와 연결하는 패키지가 `camera_ros`입니다.
@@ -409,30 +448,87 @@ RPi5의 CSI 카메라는 **libcamera**라는 라이브러리로 다룹니다. RO
 
 | 순서 | 내용 |
 |:--:|------|
-| ① 준비 | 커널 인식 확인 · 영상 확인 도구 설치 · 작업 공간 만들기 · 소스 내려받기 |
-| ② 의존성 설치 | `rosdep`으로 camera_ros가 사용하는 ROS 패키지 설치 |
+| ① 준비 | ①-1 커널 인식 확인 · ①-2 영상 확인 도구 설치 · ①-3 소스 내려받기 |
+| ② 의존성 설치 | ②-1 rosdep 설치 · ②-2 초기화 · ②-3 갱신 · ②-4 의존 패키지 설치 |
 | ③ 필수 패키지 설치 | libcamera 빌드 도구·라이브러리 설치 |
-| ④ 빌드 | `colcon build` — 약 10~20분(실측 10분 38초) |
-| ⑤ 빌드 후 확인 | 환경 등록 · 실행 경로 확인 · 카메라 노드 실행 |
+| ④ 빌드 | ④-1 빌드 대상 확인 · ④-2 빌드(약 10~20분, 실측 10분 38초) |
+| ⑤ 빌드 후 확인 | ⑤-1 환경 등록 · ⑤-2 실행 경로 확인 · ⑤-3 카메라 노드 실행 |
 
-- ④ 빌드가 진행되는 동안 4·6장 이론을 읽어 둡니다
+- 각 단계는 **실행 → 확인 → 결과에 따른 조치** 순서 — 조치 뒤에 적힌 단계로 돌아가 이어서 진행
+- ④-2 빌드가 진행되는 동안 4·6장 이론을 읽어 둡니다
 
-**① 준비**
+**①-1 커널 인식 확인**
 
 ```bash
-sudo dmesg | grep -i imx708                  # imx708이 보여야 시작 — 없으면 4.1 케이블·설정 파일
+sudo dmesg | grep -i imx708
+```
+
+- `imx708`이 포함된 줄이 나오면 → ①-2로 진행
+- 아무것도 나오지 않으면 → 4.1 연결 절차·설정 파일을 확인하고 재부팅한 뒤 **①-1을 다시** 실행
+- 재부팅 후에도 나오지 않으면 → 교수에게 알림
+
+**①-2 영상 확인 도구 설치**
+
+```bash
 sudo apt update
-sudo apt install -y git ros-jazzy-rqt-image-view ros-jazzy-image-tools   # 영상 확인 도구
+sudo apt install -y git ros-jazzy-rqt-image-view ros-jazzy-image-tools
+```
+
+- 오류 없이 끝나면 → ①-3으로 진행
+- apt판 `ros-jazzy-camera-ros`·`libcamera-tools`는 설치하지 않음(빌드한 판과 혼동 방지) — 이미 설치했다면 아래 명령으로 제거한 뒤 ①-3으로 진행
+
+```bash
+sudo apt remove -y ros-jazzy-camera-ros libcamera-tools
+```
+
+**①-3 작업 공간 만들기·소스 내려받기**
+
+```bash
 source /opt/ros/jazzy/setup.bash
 mkdir -p ~/camera_ws/src && cd ~/camera_ws/src
 git clone https://github.com/raspberrypi/libcamera.git
 git clone https://github.com/christianrauch/camera_ros.git
 ```
 
-- apt판 `ros-jazzy-camera-ros`·`libcamera-tools`는 설치하지 않음 — 이미 설치했다면 `sudo apt remove ros-jazzy-camera-ros libcamera-tools`로 제거(빌드한 판과 혼동 방지)
+- `ls ~/camera_ws/src`에 `libcamera`·`camera_ros` 두 폴더가 보이면 → ②-1로 진행
+- `already exists` 오류가 나오면 이미 내려받은 상태 → ②-1로 진행
+- 네트워크 오류로 중단되면 → 연결을 확인하고 **실패한 `git clone` 줄만 다시** 실행
 - `~/camera_ws`는 `~/ros2_ws`와 분리한 작업 공간 — 이후 `~/ros2_ws` 빌드 때 libcamera를 다시 빌드하지 않음
 
-**② 의존성 설치**
+**②-1 rosdep 설치**
+
+```bash
+sudo apt install -y python3-rosdep
+```
+
+- 오류 없이 끝나면 → ②-2로 진행
+- `python3-rosdep2`와 충돌한다는 오류가 나오면 → 아래 명령을 실행하고 **②-1을 다시** 실행(수업 중 발생)
+
+```bash
+sudo apt remove -y python3-rosdep2
+```
+
+- Ubuntu 저장소의 `python3-rosdep2`와 ROS 저장소의 `python3-rosdep`은 함께 설치되지 않음
+
+**②-2 rosdep 초기화** (RPi5마다 최초 1회)
+
+```bash
+sudo rosdep init
+```
+
+- 완료 메시지가 나오면 → ②-3으로 진행
+- `already exists` 오류가 나오면 이미 초기화된 상태 → 그대로 ②-3으로 진행
+
+**②-3 목록 갱신**
+
+```bash
+rosdep update
+```
+
+- 오류 없이 끝나면 → ②-4로 진행
+- 네트워크 오류로 중단되면 → 연결을 확인하고 **②-3을 다시** 실행
+
+**②-4 의존 패키지 설치**
 
 ```bash
 source /opt/ros/jazzy/setup.bash
@@ -440,12 +536,9 @@ cd ~/camera_ws
 rosdep install -y --from-paths src --ignore-src --rosdistro jazzy --skip-keys=libcamera
 ```
 
-- `--skip-keys=libcamera` = apt의 libcamera를 설치하지 않고 ①에서 내려받은 소스를 사용
-
-| 오류 | 조치 |
-|------|------|
-| `rosdep: command not found` | `sudo apt install -y python3-rosdep` |
-| 소스 목록(`sources list`) 오류 | `sudo rosdep init` → `rosdep update`(최초 1회) |
+- `All required rosdeps installed successfully`가 나오면 → ③으로 진행
+- `rosdep: command not found`가 나오면 ②-1이 끝나지 않은 상태 → **②-1부터 다시** 진행
+- `--skip-keys=libcamera` = apt의 libcamera를 설치하지 않고 ①-3에서 내려받은 소스를 사용
 
 **③ 필수 패키지 설치** — ② 이후에도 libcamera 빌드 도구는 빠져 있을 수 있어 직접 설치합니다
 
@@ -459,52 +552,76 @@ sudo apt install -y python3-colcon-meson meson ninja-build pkg-config \
 |------|------|
 | `python3-colcon-meson` · `meson` · `ninja-build` · `pkg-config` | 빌드 도구 |
 | `libyaml-dev` · `python3-yaml` · `python3-ply` · `python3-jinja2` | libcamera 필수 라이브러리 |
-| `libssl-dev` · `libevent-dev` · `libudev-dev` | 모듈 서명 · `cam` 도구 · 장치 탐지 |
+| `libssl-dev` · `libevent-dev` · `libudev-dev` | 모듈 서명 · 이벤트 처리 · 장치 탐지 |
 
-- ⚠️ 이 단계를 빠뜨리면 ④ 빌드가 **수 초 만에 실패**(실측 — libcamera 12.4초)
+- 오류 없이 끝나면 → ④-1로 진행
+- ⚠️ 이 단계를 빠뜨리면 ④-2 빌드가 **수 초 만에 실패**(실측 — libcamera 12.4초)
 
-**④ 빌드**
+**④-1 빌드 대상 확인**
 
 ```bash
 cd ~/camera_ws
+colcon list
+```
+
+- `camera_ros`·`libcamera` 2개가 나오면 → ④-2로 진행
+- 아무것도 나오지 않으면 소스가 없거나 위치가 다른 상태 → **①-3부터 다시** 진행
+- `camera_ros`만 나오면 libcamera를 읽는 빌드 도구가 없는 상태 → **③을 다시** 실행하고 ④-1로 돌아옴
+
+**④-2 빌드**
+
+```bash
 colcon build --event-handlers=console_direct+
 ```
 
 - RPi5에서 **약 10~20분**(실측 10분 38초)
-- 완료 확인 = 마지막 줄 `Summary: 2 packages finished`(libcamera·camera_ros)
-
-빌드가 실패하면:
-
-| 증상 | 조치 |
-|------|------|
-| libcamera가 수 초 만에 실패 | ③ 필수 패키지 설치 → 빌드 결과 삭제 후 재빌드(아래) |
-| 원인을 알 수 없음 | `~/camera_ws/log/latest_build/libcamera/stderr.log` 마지막 부분 확인 |
+- 마지막 줄이 `Summary: 2 packages finished`이면 → ⑤-1로 진행
+- `Failed`가 나오면 → **③을 다시** 실행하고, 아래 명령으로 빌드 결과를 지운 뒤 **④-2를 다시** 실행
 
 ```bash
 cd ~/camera_ws && rm -rf build install log    # 빌드 결과만 삭제 — src는 유지
-colcon build --event-handlers=console_direct+
 ```
 
-- 특정 패키지만 다시 빌드하려면 `--packages-select <패키지명>`(Day 3 자료 10장)
+- 같은 실패가 반복되면 → `~/camera_ws/log/latest_build/libcamera/stderr.log` 마지막 부분을 교수에게 전달
 
-**⑤ 빌드 후 확인**
+**⑤-1 환경 등록**
 
 ```bash
 echo "source ~/camera_ws/install/setup.bash" >> ~/.bashrc   # 새 터미널에도 적용
 source ~/camera_ws/install/setup.bash
-ros2 pkg prefix camera_ros       # /home/<사용자>/camera_ws/install/camera_ros
-ros2 run camera_ros camera_node  # 로그에 0: imx708_wide
 ```
 
-| 확인 | 정상 | 아니면 |
-|------|------|------|
-| 실행 경로 | `camera_ws` 경로 | `/opt/ros/jazzy` → `source` 재실행 · apt판 제거 |
-| 노드 로그 | `0: imx708_wide` · `rpi/pisp` | `no cameras available` → 실행 경로 확인 |
+- 오류 없이 끝나면 → ⑤-2로 진행
+- `No such file or directory`가 나오면 빌드가 끝나지 않은 상태 → **④-2로 돌아가** 완료 줄을 확인
 
-- `/opt/ros/jazzy`가 나오면 apt판 camera_ros가 실행되는 상태 — 원본 판 libcamera를 사용해 이 카메라를 인식하지 못함
-- 이어서 5.2 실행 로그 읽기 → 5.3 **카메라 동작 확인 5단계**(2~5단계)로 진행
+**⑤-2 실행 경로 확인**
 
-> **여기서 실패하면 이후 진행이 막힙니다 —** 카메라 스택이 구동되지 않으면 6장 이후가 전부 막힙니다. 소스 빌드 후에도 카메라가 구동되지 않으면 **10장 대응 경로**(카메라 없이 진행)로 넘어갑니다.
+```bash
+ros2 pkg prefix camera_ros
+```
+
+- `/home/<사용자>/camera_ws/install/camera_ros`가 나오면 → ⑤-3으로 진행
+- `/opt/ros/jazzy`가 나오면 apt판이 실행되는 상태(원본 판 libcamera라 이 카메라를 인식하지 못함) → 아래 명령으로 제거하고 ⑤-1의 `source` 줄을 실행한 뒤 **⑤-2를 다시** 실행
+
+```bash
+sudo apt remove -y ros-jazzy-camera-ros
+```
+
+- `Package not found`가 나오면 환경 등록이 적용되지 않은 상태 → **⑤-1을 다시** 실행
+
+**⑤-3 카메라 노드 실행**
+
+```bash
+ros2 run camera_ros camera_node
+```
+
+- 로그에 `0: imx708_wide`가 나오면 → 설치 완료. `Ctrl+C`로 종료하고 5.2로 진행
+- `no cameras available`이 나오면 → `Ctrl+C`로 종료하고 **⑤-2를 다시** 실행
+- ⑤-2가 `camera_ws` 경로인데도 같은 메시지가 나오면 → `groups` 출력에 `video`가 있는지 확인. 없으면 `sudo usermod -aG video $USER` 실행 후 재로그인하고 **⑤-3을 다시** 실행
+- `video`가 있어도 같으면 → **①-1을 다시** 실행해 커널 인식을 확인 → 그래도 같으면 교수에게 알림
+- 경고가 여러 줄 섞여 나오는 것은 정상 — 의미는 5.2 실행 로그 읽기
+
+> **여기서 실패하면 이후 진행이 막힙니다 —** 카메라 스택이 구동되지 않으면 6장 이후가 전부 막힙니다. 위 조치를 끝까지 수행해도 구동되지 않으면 교수 안내에 따라 **9장 대응 경로**(카메라 없이 진행)로 넘어갑니다.
 
 ### 5.2 카메라 노드 실행
 
@@ -526,6 +643,7 @@ ros2 topic bw /camera/image_raw       # 대역폭 — MB 단위가 나옴
 | **`topic bw`** | **수십 MB/s** — 4.2에서 계산한 값과 대조 |
 
 - `topic bw`를 여기서 쓰는 이유 — Day 1에서 명령만 배웠던 것이 **실제로 의미를 갖는 첫 지점**
+- 이미지 토픽은 `topic echo`로 출력하지 않음 — 픽셀 값 배열이 화면을 채움
 - 해상도를 낮추면 부담이 줄어듦:
 
 ```bash
@@ -566,32 +684,18 @@ ros2 run rqt_image_view rqt_image_view
 
 **카메라 동작 확인 — 5단계**
 
-앞 단계가 성립해야 다음 단계로 넘어갑니다. 확인이 멈춘 단계가 원인의 위치입니다.
+앞 단계가 성립해야 다음 단계로 넘어갑니다. 정상이 아니면 "아니면" 열의 조치를 실행하고 적힌 단계부터 다시 확인합니다.
 
-| 단계 | 확인 내용 | 명령 | 정상 |
+| 단계 | 명령 | 정상 | 아니면 |
 |:--:|------|------|------|
-| 1 | 커널의 카메라 인식 | `sudo dmesg \| grep -i imx708` | `imx708` 출력 |
-| 2 | 카메라 단독 동작(ROS 없이) | `cam -l` → `cam` 촬영(아래) | 사진 파일 생성·장면 확인 |
-| 3 | ROS에서 카메라 동작 | `ros2 run camera_ros camera_node` | 로그 `0: imx708_wide` |
-| 4 | 영상 토픽 발행 | `ros2 topic hz /camera/image_raw` | 약 30Hz |
-| 5 | 최종 검증 | `rqt_image_view` → `/camera/image_raw` | 영상 표시 · 카메라 앞 움직임이 화면에 즉시 반영 |
+| 1 커널 인식 | `sudo dmesg \| grep -i imx708` | `imx708` 출력 | 5.1 ①-1 조치 → 1 다시 |
+| 2 스택 빌드 | `ros2 pkg prefix camera_ros` | `camera_ws` 경로 | 5.1 ⑤-2 조치 → 2 다시 |
+| 3 ROS 카메라 | `ros2 run camera_ros camera_node` | `0: imx708_wide` | 2부터 다시 |
+| 4 토픽 발행 | `ros2 topic hz /camera/image_raw` | 약 30Hz | 4 조치(아래) → 4 다시 |
+| 5 최종 검증 | `rqt_image_view` → `/camera/image_raw` | 영상·움직임 반영 | 5 조치(아래) → 5 다시 |
 
-- 1 실패 = 케이블·설정 파일(4.1) / 2 실패 = libcamera 빌드(5.1 ④) / 3 실패 = `ros2 pkg prefix camera_ros`로 apt판 여부 확인(5.1 ⑤) / 4 실패 = 노드 종료·`ROS_DOMAIN_ID` 불일치 / 5 실패 = 원격 데스크톱 연결(3.2)
-- 이미지 토픽은 `topic echo`로 출력하지 않습니다 — 픽셀 값 배열이 화면을 채웁니다
-
-2단계 — ROS 없이 카메라 확인 (5.1 소스 빌드 완료 후):
-
-```bash
-CAM=~/camera_ws/install/libcamera/bin/cam                              # 빌드한 판의 cam — 전체 경로로 지정
-$CAM -l                                                                # imx708_wide가 목록에 보이면 정상
-$CAM -c 1 --capture=5 --file=test-#.ppm --stream pixelformat=BGR888   # 사진 5장을 PPM 파일로 저장
-```
-
-- 원격 데스크톱 화면에서 파일 관리자로 `test-…ppm`을 열어 실제 장면이 촬영되었는지 확인
-- 사진이 보이면 카메라·케이블·라이브러리는 정상 — 이후 문제는 ROS 쪽(3~5단계)
-- ⚠️ `cam`만 입력하면 apt판(`/usr/bin/cam` — 로그에 `libcamera v0.2.0`)이 실행되어 **빈 목록**이 나옴 — 카메라 문제가 아님
-- 위 경로에 `cam`이 없으면 이 단계는 생략 — 3단계 카메라 노드가 빌드한 libcamera로 동작을 확인함
-- 픽셀 형식 오류가 나오면 `pixelformat=RGB888`로 바꾸거나 `--stream` 옵션을 빼고 실행
+- 4 조치 = 3의 노드가 실행 중인지 확인 · 두 터미널의 `echo $ROS_DOMAIN_ID` 값이 같은지 확인
+- 5 조치 = SSH가 아닌 원격 데스크톱 화면에서 실행했는지(3.2) · 좌측 상단에서 `/camera/image_raw`를 선택했는지 확인 · 영상이 끊기거나 느리면 해상도를 640×480으로 낮춤(5.2)
 
 ---
 
@@ -829,6 +933,9 @@ ros2 topic echo /target_point
 
 초록색 물체를 카메라 앞에서 움직이며 관찰합니다.
 
+- 터미널 2에 `ModuleNotFoundError`(`cv2`·`cv_bridge`)가 나오면 → 7.1 설치 명령 실행 · `package.xml`의 `<depend>cv_bridge</depend>` 확인 → 빌드부터 **다시** 실행
+- 터미널 3에 아무것도 출력되지 않으면 → 터미널 1 카메라 노드 실행 여부 확인(5.3 5단계 4) → 터미널 2부터 **다시** 실행
+
 | 조작 | 예상 출력 |
 |------|------|
 | 대상을 화면 **왼쪽**으로 | x가 작아짐 (0에 가까움) |
@@ -836,7 +943,7 @@ ros2 topic echo /target_point
 | 대상을 **가까이** | z(면적)가 커짐 |
 | 대상을 치움 | x = -1.0 (미검출) |
 
-**색 범위 조정** — 검출되지 않으면 코드를 고치지 말고 파라미터를 바꿉니다:
+**색 범위 조정** — 대상을 비춰도 x = -1.0만 나오면 코드를 고치지 말고 파라미터를 바꿉니다:
 
 ```bash
 ros2 param set /color_tracker h_min 35
@@ -844,8 +951,9 @@ ros2 param set /color_tracker h_max 90
 ros2 param set /color_tracker s_min 60
 ```
 
+- 대상을 움직여 x가 변하면 → 조정 완료. 맞춘 값은 `ros2 param dump /color_tracker > color.yaml`로 저장
+- 여전히 -1.0이면 → 7.5 마스크 영상으로 원인을 확인한 뒤 **이 조정으로 돌아옴**
 - Day 3 자료 5.6에서 배운 방식 그대로 — **실행 중 변경**이 여기서 진가를 발휘
-- 맞춘 값은 `ros2 param dump /color_tracker > color.yaml`로 저장
 
 > **자주 하는 실수**
 >
@@ -869,8 +977,10 @@ ros2 run rqt_image_view rqt_image_view      # /mask_view 선택
 ```
 
 - 추가 위치 — 첫 줄은 `self.pub = ...` 다음 줄에 **같은 들여쓰기**로, 둘째 줄은 `self.pub.publish(point)` 다음 줄에(들여쓰기가 어긋나면 다른 메서드에 속하게 됨)
-- 대상이 **흰색으로 또렷하게** 보이면 범위가 맞은 것
-- 화면 전체가 희거나 검으면 범위가 크게 어긋난 것
+- 대상이 **흰색으로 또렷하게** 보이면 범위가 맞은 상태 → 7.4 관찰로 돌아감
+- 화면 전체가 흰색이면 범위가 지나치게 넓은 상태 → `s_min`·`v_min`을 높이고 **다시** 확인
+- 화면 전체가 검으면 범위가 대상 색과 어긋난 상태 → `h_min`·`h_max`를 대상 색에 맞추고 **다시** 확인
+- 작은 흰 점이 여러 개 남으면 → 코드 ⑦의 `(5, 5)`를 `(7, 7)`·`(9, 9)`로 늘리고(6.3) 빌드부터 **다시** 실행
 - **진단 수단을 만들어 두는 것**이 영상 처리 작업의 기본
 
 ---
@@ -918,6 +1028,8 @@ roi = frame[int(h * 2 / 3):, :]        # 아래쪽 1/3
 
 > **자주 하는 실수 —** `h * 2 / 3`은 나눗셈 결과이므로 **실수**(320.0)입니다. 인덱스는 정수여야 하므로 `int()`로 변환하지 않으면 오류가 납니다.
 
+- 실행 시 `TypeError: slice indices must be integers`가 나오면 → 슬라이싱 안의 `int()` 변환을 확인하고 **다시** 실행
+
 **오차 계산**:
 
 ```
@@ -953,6 +1065,8 @@ self.pub.publish(twist)
 | 선을 잃었을 때 | **정지 후 탐색** — 그대로 직진하면 이탈이 커짐 |
 | 검증 | turtlesim을 띄우고 `/turtle1/cmd_vel`로 remap |
 
+- turtlesim이 선의 반대 방향으로 회전하면 → `-error * gain`의 부호(`-`)를 확인하고 **다시** 실행(4.3 좌표계)
+
 **코드 읽기**
 
 | 코드 | 뜻 |
@@ -977,61 +1091,21 @@ self.pub.publish(twist)
 
 ---
 
-## 9. 문제 해결 — 카메라·검출 진단
+## 9. 대응 경로 — 카메라 없이 진행하기
 
-실습 중 막혔을 때 확인하는 순서입니다.
-
-**카메라·토픽**
-
-| 증상 | 원인 | 조치 |
-|------|------|------|
-| `dmesg`에 `imx708`이 없음 | 15핀 케이블 사용 · 케이블 방향 반대 · 클립 접촉 불량 · 자동 인식 실패 | 전원을 끄고 4.1 절차로 재연결 → 그래도 없으면 4.1 설정 파일 확인·재부팅 |
-| `imx708`은 보이는데 카메라 노드가 `no cameras available` 출력 | apt판 camera_ros·libcamera 실행 중 — `ros2 pkg prefix camera_ros`가 `/opt/ros/jazzy` | 5.1 소스 빌드 → ⑤ `source ~/camera_ws/install/setup.bash` |
-| `cam -l` 빈 목록 · 로그에 `libcamera v0.2.0` | apt판 `cam`(`/usr/bin/cam`)이 실행됨 — 카메라 문제 아님 | 빌드한 판 `~/camera_ws/install/libcamera/bin/cam -l` 실행 |
-| 소스 빌드 후에도 인식되지 않음 | 사용자 권한 · 커넥터 설정 | `groups`에 `video`가 없으면 `sudo usermod -aG video $USER` 후 재로그인 · `config.txt`의 `cam0`·`cam1` 확인 |
-| `ros2 pkg list`에 `camera_ros`가 없음 | 소스 빌드 미완료 · 환경 미등록 | 5.1 ④ 빌드 → ⑤ `source ~/camera_ws/install/setup.bash` |
-| `/camera/image_raw`가 목록에 없음 | 카메라 노드 미실행 · 다른 터미널의 `ROS_DOMAIN_ID` 불일치 | `ros2 node list`로 노드 확인 → `echo $ROS_DOMAIN_ID` 대조 |
-| 영상 창이 끊기거나 느림 | 원격 데스크톱 대역폭 | 해상도 640×480으로 낮춤(5.2) |
-| `topic echo /camera/image_raw`로 화면이 숫자로 뒤덮임 | 이미지 토픽을 텍스트로 출력 | `Ctrl+C` → `rqt_image_view` 사용 |
-
-**검출**
-
-| 증상 | 원인 | 조치 |
-|------|------|------|
-| `x = -1.0`만 출력됨(미검출) | HSV 범위가 조명과 맞지 않음 | 7.5 마스크 확인 → `param set`으로 범위 조정(7.4) |
-| 화면 전체가 흰색 마스크 | 범위가 지나치게 넓음(`s_min`·`v_min`이 너무 낮음) | `s_min`·`v_min`을 높임 |
-| 작은 점이 여러 개 검출됨 | 잡음 제거 부족 | 커널 크기 5 → 7·9로 확대(6.3) |
-| 대상 방향과 반대로 회전 | 부호 반전 누락 | `angular.z = -error * gain` 확인(8.2) |
-| `ModuleNotFoundError: cv2` 또는 `cv_bridge` | 패키지 미설치 | 7.1 설치 명령 재실행 · `package.xml`에 `<depend>cv_bridge</depend>` 추가 |
-| `IndexError` 또는 슬라이스 오류 | `int()` 없이 실수 인덱스 사용 | 8.2 자주 하는 실수 |
-
-- 진단의 기본 순서 = **커널 인식(`dmesg`) → libcamera 인식(`cam -l`) → 토픽(`topic hz`) → 마스크(7.5) → 좌표(`topic echo /target_point`)** — 앞에서 뒤로 한 단계씩 확인합니다
-
----
-
-## 10. 대응 경로 — 카메라 없이 진행하기
-
-5.1 소스 빌드 후에도 카메라가 구동되지 않을 때 사용합니다. 실패에 대비해 별도 경로를 준비해 두는 같은 방식을 Day 8 결선·Day 9 실물 전환에서도 사용합니다.
-
-그래도 인식되지 않으면 — 마지막 확인:
-
-| 확인 | 조치 |
-|------|------|
-| 케이블·설정 파일 | 변환 케이블 규격·연결 상태·`config.txt` 설정 확인(4.1) |
-| 사용자 권한 | `groups` 출력에 `video`가 없으면 `sudo usermod -aG video $USER` 실행 후 재로그인 |
-| 커넥터 번호 | `config.txt`의 `cam0`·`cam1`이 실제로 꽂은 커넥터(`CAM/DISP0`·`CAM/DISP1`)와 일치하는지 확인 |
+4.1·5.1의 조치를 끝까지 수행해도 카메라가 구동되지 않아 **교수가 전환을 안내한 경우**에 사용합니다. 실패에 대비해 별도 경로를 준비해 두는 같은 방식을 Day 8 결선·Day 9 실물 전환에서도 사용합니다.
 
 대체 경로 — 카메라가 구동되지 않은 학생도 6~8장을 진행합니다.
 
 | 경로 | 방법 |
 |:--:|------|
 | ⓐ **다른 기기의 영상 구독** | 카메라가 정상인 학생의 기기에서 **카메라 노드만** 실행 → **같은 `ROS_DOMAIN_ID`면 자기 기기에서 그 토픽을 구독**(Day 1). 기기를 공용으로 쓰는 것이 아니라 **각자 자기 노드를 자기 기기에서 작성·실행** |
-| ⓑ **저장 영상** | 미리 기록한 `ros2 bag`을 재생(10.1) — 카메라 없이 `/camera/image_raw`가 발행됨 |
+| ⓑ **저장 영상** | 미리 기록한 `ros2 bag`을 재생(9.1) — 카메라 없이 `/camera/image_raw`가 발행됨 |
 | ⓒ 이미지 파일 | OpenCV로 정지 영상을 읽어 처리 — ROS2 없이 6장 개념만 확인 |
 
 - **ⓐ가 가장 권장** — **노드가 여러 기기에 흩어져도 같은 도메인이면 연결된다**는 것의 실증이며, 오늘 배운 내용이 그대로 쓰임
 
-### 10.1 영상 저장과 재생 — 대체 경로 ⓑ
+### 9.1 영상 저장과 재생 — 대체 경로 ⓑ
 
 카메라 없이 `/camera/image_raw`를 발행하려면 미리 기록한 파일을 재생합니다.
 
@@ -1046,7 +1120,7 @@ ros2 bag play run1                              # 재생 — 카메라 없이 �
 
 ---
 
-## 11. 오늘의 요약
+## 10. 오늘의 요약
 
 | 항목 | 내용 |
 |------|------|
@@ -1063,7 +1137,7 @@ ros2 bag play run1                              # 재생 — 카메라 없이 �
 
 ---
 
-## 12. 다음 시간
+## 11. 다음 시간
 
 **Day 5 — AI 이미지 분류** (9/21)
 
