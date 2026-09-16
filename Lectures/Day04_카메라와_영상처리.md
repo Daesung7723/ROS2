@@ -30,14 +30,15 @@ Day 1~3의 turtlesim은 **좌표가 이미 주어진** 세계였습니다. turtl
 | 데이터 크기 | 수십 바이트 | 수십만~수백만 바이트 |
 | 오차 | 없음 | 조명·그림자·반사에 따라 변동 |
 
-오늘 완성할 것 — 카메라 영상에서 **특정 색을 찾아 그 위치를 좌표로 출력**하는 노드. 이것이 Day 5(AI 분류)와 Day 6(판단·행동 연결)의 입력이 됩니다.
+**오늘 완성할 것** — RPi5에서 **카메라 노드를 구동해 `/camera/image_raw`를 발행**하고, 그 영상을 화면으로 확인합니다. 영상에서 값을 산출하는 처리는 Day 5에서 이어집니다.
 
 | 단계 | 장 | 내용 | 산출물 |
 |:--:|:--:|------|------|
-| ① 전환 | 2·3 | RPi5 원격 연결 → Day 1~3 작업물 옮기기 → 동작 확인 | RPi5에서 실행되는 `my_first_pkg` |
+| ① 전환 | 2·3 | RPi5 원격 연결 → 환경 확인 | RPi5 작업 환경 |
 | ② 카메라 | 4·5 | 이미지 토픽 구조 → 카메라 노드 구동 → 영상 확인 | `/camera/image_raw` 발행 |
-| ③ 영상 처리 | 6·7 | 색공간·마스킹 → 색상 검출 노드 작성 | `color_tracker` |
-| ④ 미니프로젝트 | 8 | 라인 인식 — 영상에서 진행 방향 산출 | `line_follower` |
+
+- 7장 요약 뒤의 **6장 카메라를 사용할 수 없을 때**는 5.1 소스 빌드 후에도 카메라가 구동되지 않을 때만 실행하는 조건부 절입니다
+- **영상 처리·색상 검출·라인 인식은 Day 5에서 다룹니다** — 오늘은 카메라에서 영상이 출력되는 것까지 확인합니다
 
 Day 3까지의 복습:
 
@@ -49,7 +50,7 @@ Day 3까지의 복습:
 | launch | 여러 노드를 한 명령으로 — `ros2 launch <패키지> <파일>` |
 | 미로 자율주행 | 상태 기계(RUN·BACK·TURN)로 벽을 피해 목표에 도달 |
 
-- Day 3까지의 산출물 = `my_first_pkg`(circle_driver·pose_printer·square_driver·maze_driver) + `my_msgs`. **오늘 이 산출물을 RPi5로 옮깁니다**(3장)
+- Day 3까지의 산출물 = `my_first_pkg`(circle_driver·pose_printer·square_driver·maze_driver) + `my_msgs`. **이 작업물은 PC에 그대로 두고**, RPi5에서는 새로 만들어 빌드합니다(3.3)
 
 ### 1.1 준비물 확인
 
@@ -190,36 +191,29 @@ hostname -I                       # 주소 확인 — 메모할 것
 
 ### 3.3 RPi5에서 빌드·실행
 
-옮긴 뒤 **다시 빌드**해야 합니다. 빌드 결과물(`build`·`install`)은 기기에 종속되므로 복사해 오지 않습니다.
+**PC의 작업물은 옮기지 않습니다.** RPi5에서 워크스페이스를 새로 만들어 **빌드 흐름만 먼저 확인**합니다.
 
-```bash
-cd ~/ros2_ws
-colcon build
-source install/local_setup.bash
-ros2 run my_first_pkg circle_driver     # Day 2 산출물이 그대로 동작
-```
-
-```bash
-# 다른 터미널
-ros2 run turtlesim turtlesim_node
-```
-
-관찰 — turtle이 원을 그리면 작업물이 정상적으로 옮겨진 것입니다.
-
-| 확인 명령 | 보는 것 |
+| 이유 | 내용 |
 |------|------|
-| `ros2 node list` | 노드가 RPi5에서 실행 중 |
-| `ros2 topic hz /turtle1/cmd_vel` | **발행 주기** — PC와 비교해 차이가 있는지 |
-| `rqt_graph` | 연결 구조 (원격 데스크톱 화면에서) |
+| 기기 종속 | 빌드 결과물(`build`·`install`)은 생성한 기기에 종속되어 복사해도 사용할 수 없음 |
+| **절차 숙달** | 워크스페이스 → 패키지 → 등록 → 빌드는 앞으로 계속 반복하는 절차 |
 
-> **Tip —** `scp`로 옮겼다면 `build`·`install`·`log` 폴더가 함께 복사되었을 수 있습니다. 지우고 다시 빌드하십시오.
->
-> ```bash
-> cd ~/ros2_ws && rm -rf build install log && colcon build
-> ```
+```bash
+mkdir -p ~/ros2_ws/src
+cd ~/ros2_ws && colcon build          # build·install·log·src 4폴더 생성 확인
+source install/local_setup.bash
+```
 
-- **성능 비교** — 같은 코드가 PC와 RPi5에서 얼마나 다른 성능으로 실행되는지 `topic hz`로 확인. Day 9 실물 설계의 근거가 됨
-- RPi5에도 **colcon이 설치되어 있어야** 합니다(Day 3 자료 3.0 — `which colcon`으로 확인)
+- 4폴더가 보이면 → 4장으로 진행
+- `colcon: command not found`가 나오면 → 아래를 실행한 뒤 **빌드부터 다시** 수행(Day 3 자료 3.0)
+
+```bash
+sudo apt install -y python3-colcon-common-extensions ros-dev-tools
+```
+
+> **Tip —** `echo "source ~/ros2_ws/install/local_setup.bash" >> ~/.bashrc`를 실행해 두면 새 터미널에서도 자동으로 적용됩니다.
+
+- **노드를 만들어 실행하는 것은 Day 5 자료 3장**에서 `my_car_pkg`로 수행합니다 — 오늘은 카메라를 세우는 것이 목표입니다
 
 ---
 
@@ -653,7 +647,7 @@ ros2 run rqt_image_view rqt_image_view
 - **ⓐ가 가장 권장** — **같은 네트워크 안에서는 노드가 여러 기기에 흩어져도 같은 도메인이면 연결된다**는 것의 실증이며, 오늘 배운 내용이 그대로 쓰임
 - ⓐ는 RPi5끼리 구독하는 방식 — 강의실 PC의 WSL2에서 구독하면 기본 설정에서는 토픽이 보이지 않을 수 있음
 
-### 9.1 영상 저장과 재생 — 방법 ⓑ
+### 6.1 영상 저장과 재생 — 방법 ⓑ
 
 카메라 없이 `/camera/image_raw`를 발행하려면 미리 기록한 파일을 재생합니다.
 
@@ -664,7 +658,7 @@ ros2 bag play run1                              # 재생 — 카메라 없이 �
 
 - 이미지 토픽은 용량이 크므로 **짧게** 기록 — 30초면 수백 MB
 - 재생 중에는 카메라 노드를 끄고 진행(같은 토픽에 발행자가 둘이 되지 않도록)
-- 활용 — **Day 5 학습용 이미지 수집** · 조명 조건별 데이터 비교
+- 활용 — **Day 5 자료 14.1의 학습 데이터 수집** · 조명 조건별 데이터 비교
 
 ---
 
@@ -672,16 +666,13 @@ ros2 bag play run1                              # 재생 — 카메라 없이 �
 
 | 항목 | 내용 |
 |------|------|
-| 환경 전환 | **오늘부터 RPi5** — 카메라가 CSI 방식이라 PC 불가. 원격 연결(원격 데스크톱·SSH) + 작업물 이동(`git`·`scp`) → 재빌드 |
-| 카메라 | Camera Module 3 Wide를 CSI 연결(전원 차단 상태) → Raspberry Pi판 `libcamera`(소스 빌드) → `camera_ros` → `/camera/image_raw` 발행 |
+| 환경 전환 | **오늘부터 RPi5** — 카메라가 CSI 방식이라 PC에 연결되지 않음. 원격 데스크톱·SSH로 연결 |
+| 카메라 연결 | Camera Module 3 Wide를 CSI 연결 — **전원 차단 상태에서** 작업 |
+| 카메라 스택 | Raspberry Pi판 `libcamera` 소스 빌드 → `camera_ros` → `/camera/image_raw` 발행 |
 | 이미지 토픽 | `sensor_msgs/msg/Image` — Header + **배열형 `data`**. 640×480 컬러 ≈ **0.9MB/장**, `Twist`의 약 2만 배 |
 | 좌표계 | **영상 x는 오른쪽(+) / 로봇 회전 양수는 반시계** — **부호 반전 필수** |
-| 영상 처리 | BGR → **HSV** → 마스킹 → 열림(모폴로지) → 무게중심. HSV를 쓰는 이유 = **조명이 바뀌어도 H가 유지** |
-| cv_bridge | `imgmsg_to_cv2` / `cv2_to_imgmsg` — ROS2와 OpenCV의 연결 |
-| 검출 노드 | `color_tracker` — 색 범위를 **파라미터로** 빼 조명 변화에 대응. 미검출은 `-1.0`으로 표시 |
-| Python 문법 | 상속·`super()`·`self.`·콜백 인자·점 연결·리스트→배열·튜플 인자·딕셔너리 키·동시 대입·`try/finally`·슬라이싱 — 이후 모든 노드 코드에 반복 |
-| 진단 | 마스크 영상을 발행해 `rqt_image_view`로 확인 — **검출되지 않는 원인을 확인하는 수단** |
-| 산출물 | `my_first_pkg` — **color_tracker**(색상 검출) · **line_follower**(라인 인식 — 미니프로젝트) |
+| 확인 | `rqt_image_view`로 영상 표시까지 확인 — 카메라에서 토픽까지의 경로가 성립 |
+| 작업 방식 | PC의 작업물은 옮기지 않음 — RPi5에서 **새 패키지로 다시 작성**(Day 5 자료 3장) |
 
 ---
 
@@ -689,6 +680,7 @@ ros2 bag play run1                              # 재생 — 카메라 없이 �
 
 **Day 5 — AI 이미지 분류** (9/21)
 
-- 색 범위 검출이 아니라 **학습 모델로 표지판의 종류를 구분** — Teachable Machine으로 학습 → TFLite(TensorFlow Lite)로 배포
+- **영상 처리와 AI 분류** — 오늘 확인한 영상에서 좌표를 산출하고(색상 검출), 학습 모델로 표지판의 종류를 구분합니다
+- Teachable Machine으로 학습 → TFLite(TensorFlow Lite) 형식으로 배포 → RPi5에서 추론
 - 각자 표지판을 촬영해 학습 데이터를 만듭니다 — **RPi5 카메라가 동작하는 상태**로 참석합니다
-- 오늘의 `color_tracker` 구조(이미지 구독 → 처리 → 결과 발행)가 추론 노드의 골격이 됩니다
+- 카메라를 끝내 구동하지 못했으면 6장의 방법으로 영상을 확보한 뒤 참석합니다
