@@ -24,8 +24,8 @@ Raspberry Pi 5 기반 자율주행 차량을 12일 과정으로 완성합니다.
 | 1 | 8/24 | 환경 구축과 ROS2 첫걸음 | [바로가기](Lectures/Day01_환경구축과_ROS2_첫걸음.md) |
 | 2 | 8/31 | turtlesim 종합 제어 — 토픽·서비스·액션 + rclpy 첫 코드 | [바로가기](Lectures/Day02_turtlesim_종합제어와_rclpy.md) |
 | 3 | 9/7 | 패키지·colcon — 멀티 노드 미로 자율주행 | [바로가기](Lectures/Day03_패키지와_미로_자율주행.md) |
-| 4 | 9/14 | 카메라·영상 처리 — 색상과 라인 인식 (RPi5 전환) | [바로가기](Lectures/Day04_카메라와_영상처리.md) |
-| 5 | 9/21 | AI 이미지 분류 — 표지판 인식 (Teachable Machine → TFLite) | [바로가기](Lectures/Day05_AI_분류와_추론_노드.md) |
+| 4 | 9/14 | 카메라 연결 — 원격 연결과 카메라 노드 구동 (RPi5 전환) | [바로가기](Lectures/Day04_카메라와_영상처리.md) |
+| 5 | 9/21 | 영상 처리와 AI 이미지 분류 — 색상 검출·표지판 인식 (Teachable Machine → TFLite) | [바로가기](Lectures/Day05_AI_분류와_추론_노드.md) |
 | 6 | 9/28 | 시뮬레이션 통합 — 표지판에 반응하는 turtle | 예정 |
 | 7 | 10/12 | SLAM 실습 — Gazebo에서 지도 작성과 목표 주행 | 예정 |
 | 8 | 10/19 | 실물 전환 — 초음파센서·DC모터 | 예정 |
