@@ -101,11 +101,12 @@ ros2 topic hz /camera/image_raw  # 약 30Hz
 | 주기가 출력됨 | 정상 | 2장으로 진행 |
 | `ros2` 명령 미인식 | 경미 | `.bashrc`의 `source /opt/ros/jazzy/setup.bash` 확인 후 **다시** 연결 |
 | `no cameras available` | 카메라 스택 | Day 4 자료 5.1 **⑤-2부터** 다시 수행 |
-| `Package 'camera_ros' not found` | **빌드 미완** | Day 4 자료 5.1 **④-1부터** 다시 수행 — 오전 내 미완이면 **Day 4 자료 6장**으로 전환 |
+| `Package 'camera_ros' not found` | 환경 등록 또는 빌드 미완 | Day 4 자료 5.1 **⑤-1**(환경 등록) → 그래도 같으면 **④-1부터** 재빌드 |
 | SSH 연결 실패 | 네트워크 | ① 주소 확인 후 **다시** 연결 → ② **RDP**로 접속해 `hostname -I` 확인 → ③ 교수에게 알림 |
 
 - `hostname -I`는 **RPi5에서 실행하는 명령**입니다 — SSH가 연결되지 않은 상태에서는 RDP나 모니터로 접속해야 확인할 수 있습니다. RPi5는 **재부팅하면 주소가 바뀔 수 있습니다**
 - 강의실 PC에서는 **브라우저로 웹캠이 열리는지** 함께 확인합니다 — 7장 촬영에 사용합니다(열리지 않으면 7.3의 분기)
+- 카메라 스택 복구가 **오전 내에 끝나지 않으면** → Day 4 자료 6장(카메라를 사용할 수 없을 때)으로 전환해 영상을 확보하고 진행합니다
 
 ---
 
@@ -197,6 +198,19 @@ VS Code 안에서 터미널을 여러 개 열어 사용합니다(`Ctrl` + `` ` `
 - Day 2·3에서 terminator로 하던 운용을 그대로 옮긴 것입니다 — 도구가 바뀌어도 방식은 같습니다
 - 이 터미널은 RPi5의 셸입니다. `ls`·`colcon build`가 모두 RPi5에서 실행됩니다
 - **2.3 ⑤로 진행한 경우** — VS Code 대신 PC의 터미널에서 `ssh`를 **세 번 연결**해 같은 3개 구성을 만듭니다
+
+**터미널 ① — 카메라 노드 실행**
+
+1.2에서 점검용으로 실행한 카메라 노드는 `Ctrl+C`로 종료하고, 터미널 ①에서 다시 실행합니다. 오늘 작성하는 노드는 모두 이 영상을 구독하므로 **수업이 끝날 때까지 이 터미널을 유지**합니다.
+
+```bash
+ros2 run camera_ros camera_node --ros-args -p width:=640 -p height:=480
+```
+
+- 로그에 `0: imx708_wide`가 출력되고 `configured with …`에 설정한 크기가 표시되면 → 그대로 두고 3장으로 진행
+- `Package 'camera_ros' not found`가 나오면 → Day 4 자료 5.1 **⑤-1**(환경 등록)을 실행하고 **다시** 실행
+- `no cameras available`이 나오면 → Day 4 자료 5.1 **⑤-2**(실행 경로 확인)부터 수행
+- 해상도를 지정하는 이유 — 지정하지 않으면 기본값(800×600)으로 시작합니다. 5장의 면적 기준값이 **640×480 기준**이므로 크기를 맞춰 둡니다(3.4에서 실제 값을 확인)
 
 ### 2.5 그래픽 창이 필요한 도구
 
@@ -295,7 +309,7 @@ cd ~/ros2_ws && tree -L 2             # 없으면 sudo apt install -y tree
 
 ### 3.4 첫 노드 — 영상 수신 확인
 
-빌드 흐름을 확인하면서, 오늘 사용할 카메라 값도 함께 확인합니다.
+빌드 흐름을 확인하면서, 오늘 사용할 카메라 값도 함께 확인합니다. **터미널 ①의 카메라 노드가 실행 중인 상태에서 진행합니다**(2.4).
 
 `~/ros2_ws/src/my_car_pkg/my_car_pkg/image_check.py`:
 
@@ -372,7 +386,7 @@ ros2 run my_car_pkg image_check
 - 30장마다 한 줄씩 출력되면 → 4장으로 진행
 - `Package 'my_car_pkg' not found`가 나오면 → `source` 줄을 실행하고 **다시** 실행
 - `executable 'image_check' not found`가 나오면 → `setup.py` 등록을 확인하고 **빌드부터 다시** 실행
-- 아무것도 출력되지 않으면 → 카메라 노드가 실행 중인지 확인(1.2) 후 **다시** 실행
+- 아무것도 출력되지 않으면 → 터미널 ①의 카메라 노드가 실행 중인지 확인(2.4) 후 **다시** 실행
 - **카메라를 확보하지 못한 상태**면 → `ros2 node list`·`ros2 node info /image_check`로 **구독자가 등록되었는지**까지 확인하고 4장으로 진행(영상은 Day 4 자료 6장 ⓐ·ⓑ로 확보한 뒤 이 절로 돌아옴)
 
 > **자주 하는 실수 —** ① 코드를 바깥 폴더에 두는 것(`my_car_pkg/my_car_pkg/` 안쪽이 맞습니다) ② 빌드 후 `source` 누락 ③ `setup.py`의 쉼표·따옴표 빠짐 — 빌드가 실패하면 그 줄을 먼저 확인합니다.
@@ -644,18 +658,17 @@ def main(args=None):
 ```bash
 cd ~/ros2_ws && colcon build && source install/local_setup.bash
 
-# 터미널 1
-ros2 run camera_ros camera_node
-# 터미널 2
+# 터미널 ① — 2.4에서 실행해 둔 카메라 노드를 그대로 둡니다(종료됐으면 2.4의 명령으로 다시 실행)
+# 터미널 ②
 ros2 run my_car_pkg color_tracker
-# 터미널 3
+# 터미널 ③
 ros2 topic echo /target_point
 ```
 
 초록색 물체를 카메라 앞에서 움직이며 관찰합니다.
 
-- 터미널 2에 `ModuleNotFoundError`(`cv2`·`cv_bridge`)가 나오면 → 5.1의 설치 명령을 실행하고 `package.xml` 선언까지 확인한 뒤 **빌드부터 다시** 실행
-- 터미널 3에 아무것도 출력되지 않으면 → 터미널 1의 카메라 노드가 실행 중인지 확인(1.2) 후 **터미널 2부터 다시** 실행
+- 터미널 ②에 `ModuleNotFoundError`(`cv2`·`cv_bridge`)가 나오면 → 5.1의 설치 명령을 실행하고 `package.xml` 선언까지 확인한 뒤 **빌드부터 다시** 실행
+- 터미널 ③에 아무것도 출력되지 않으면 → 터미널 ①의 카메라 노드가 실행 중인지 확인(2.4) 후 **터미널 ②부터 다시** 실행
 - **영상을 확보하지 못한 상태**면 → Day 4 자료 6장의 ⓐ·ⓑ로 `/camera/image_raw`를 먼저 세운 뒤 이 절로 돌아옴
 
 | 조작 | 예상 출력 |
@@ -1219,26 +1232,25 @@ def main(args=None):
 ```bash
 cd ~/ros2_ws && colcon build && source install/local_setup.bash
 
-# 터미널 1
-ros2 run camera_ros camera_node
-# 터미널 2
+# 터미널 ① — 2.4에서 실행해 둔 카메라 노드를 그대로 둡니다(종료됐으면 2.4의 명령으로 다시 실행)
+# 터미널 ②
 ros2 run my_car_pkg sign_classifier
-# 터미널 3
+# 터미널 ③
 ros2 topic echo /sign
-# 터미널 4
+# 터미널 ④
 ros2 topic echo /sign_confidence
 ```
 
-터미널 2에 `sign_classifier ready — labels: [...]`가 출력되고 `/sign`에 판정이 출력되면 → 아래 관찰로 진행합니다. 오류는 종류에 따라 돌아갈 단계가 다릅니다.
+터미널 ②에 `sign_classifier ready — labels: [...]`가 출력되고 `/sign`에 판정이 출력되면 → 아래 관찰로 진행합니다. 오류는 종류에 따라 돌아갈 단계가 다릅니다.
 
-| 터미널 2의 출력 | 조치 |
+| 터미널 ②의 출력 | 조치 |
 |------|------|
 | `ModuleNotFoundError: ai_edge_litert` | **10.1 ①부터 다시** |
 | `ModuleNotFoundError: cv_bridge`·`cv2` | 10.1 ①의 `apt` 실행 → **빌드부터 다시** |
 | `Could not open ...` · `FileNotFoundError` | **9.3 ③** `data_files` 등록·파일 이름 확인 → **빌드부터 다시** |
 | `executable 'sign_classifier' not found` | 10.3 말미의 등록 확인 → **빌드부터 다시** |
 | `IndexError` (라벨 읽기) | `labels.txt`가 `0 stop` 형태인지 확인 → 다르면 **9.2에서 다시 내려받기** |
-| 정상 출력 후 `/sign` **무출력** | `ros2 topic hz /camera/image_raw` 확인 → 없으면 **1.2**(미확보 시 **Day 4 자료 6장**) |
+| 정상 출력 후 `/sign` **무출력** | `ros2 topic hz /camera/image_raw` 확인 → 없으면 **2.4**에서 카메라 노드를 다시 실행(영상 미확보 시 **Day 4 자료 6장**) |
 | 신뢰도가 계속 비정상 | **10.3 ⑦⑧**(입력 크기·정규화) 확인 → **빌드부터 다시** |
 
 | 조작 | 예상 |
@@ -1373,9 +1385,9 @@ self.stable_pub.publish(String(data=self.confirmed))
 ```bash
 cd ~/ros2_ws && colcon build && source install/local_setup.bash
 
-# 터미널 2
+# 터미널 ②
 ros2 run my_car_pkg sign_classifier
-# 터미널 3
+# 터미널 ③
 ros2 topic echo /sign_stable
 ```
 
@@ -1538,7 +1550,7 @@ ros2 run image_view image_saver --ros-args -r image:=/camera/image_raw \
 
 - `ls *.jpg`로 파일이 보이면 → ③으로 진행
 - `Package 'image_view' not found`가 나오면 → **①을 다시** 실행
-- 파일이 생기지 않으면 → 카메라 노드가 실행 중인지 확인(1.2) 후 **②를 다시** 실행
+- 파일이 생기지 않으면 → 터미널 ①의 카메라 노드가 실행 중인지 확인(2.4) 후 **②를 다시** 실행
 - `save_all_images:=false`로 두면 **서비스를 호출할 때만 한 장씩** 저장됩니다
 
 **③** 저장한 사진을 PC로 옮겨 Teachable Machine의 **Upload** 탭으로 올립니다.
