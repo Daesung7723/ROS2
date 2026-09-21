@@ -1037,40 +1037,56 @@ Teachable Machine의 **Export Model** → **Tensorflow Lite** 탭:
 
 ### 9.3 RPi5로 이동
 
-**①** 받을 폴더를 먼저 만듭니다 — RPi5에서 실행합니다.
+내려받은 파일은 **Windows의 다운로드 폴더**에 있습니다. 2.3에서 연결한 **VS Code 원격 창**의 탐색기에는 RPi5의 폴더가 표시되므로, Windows 탐색기의 파일을 그 위로 **끌어다 놓으면 RPi5에 복사됩니다.** 별도의 전송 명령은 필요하지 않습니다.
+
+**①** PC에서 압축을 풉니다.
+
+- Windows 탐색기의 **다운로드** 폴더에서 `converted_tflite.zip`을 마우스 오른쪽 버튼으로 클릭 → **압축 풀기**
+- 풀린 폴더에 `model_unquant.tflite`·`labels.txt` 두 파일이 보이면 → ②-1로 진행
+- `converted_tflite.zip`이 보이지 않으면 → 브라우저의 내려받기 목록에서 저장 위치를 확인한 뒤 **①을 다시** 수행
+
+**②-1** 받을 폴더를 만듭니다 — **VS Code 원격 창**에서 수행합니다.
+
+- 좌측 탐색기에서 `ros2_ws/src/my_car_pkg` 폴더를 마우스 오른쪽 버튼으로 클릭 → **새 폴더** → 이름 `model`
+- `my_car_pkg`는 같은 이름의 폴더가 바깥과 안쪽에 이중으로 있습니다 — **`setup.py`가 있는 바깥 폴더** 아래에 만듭니다
+- `setup.py`와 같은 위치에 `model` 폴더가 보이면 → ②-2로 진행
+- 좌하단에 `SSH: 192.168.0.__` 표시가 없으면 로컬 창입니다 → 2.3 ②로 연결한 뒤 **②-1을 다시** 수행
+- 2.3 ⑤(SSH 터미널만 사용)로 진행 중이면 → **②-3**으로 진행
+
+**②-2** 두 파일을 끌어다 놓습니다.
+
+- Windows 탐색기에서 `model_unquant.tflite`·`labels.txt`를 함께 선택합니다
+- VS Code 탐색기의 **`model` 폴더 위**로 끌어다 놓습니다
+
+RPi5 터미널에서 확인합니다.
+
+```bash
+ls ~/ros2_ws/src/my_car_pkg/model
+```
+
+- 두 파일이 출력되면 → ③으로 진행
+- `No such file or directory`가 나오면 → `model` 폴더를 안쪽 `my_car_pkg`에 만든 경우입니다. VS Code 탐색기에서 폴더를 바깥 `my_car_pkg`로 끌어 옮긴 뒤 **위 `ls`를 다시** 실행
+- 압축 파일(`.zip`)을 그대로 옮겼으면 → VS Code 탐색기에서 삭제하고 **①부터 다시** 수행
+
+**②-3** VS Code 원격 창을 사용하지 않는 경우 — 2.3 ⑤로 진행 중일 때만 수행합니다.
+
+받을 폴더를 RPi5의 SSH 터미널에서 만듭니다.
 
 ```bash
 mkdir -p ~/ros2_ws/src/my_car_pkg/model
 ```
 
-- 폴더가 없으면 다음 단계의 `scp`가 **경로 오류로 실패**합니다
+PC에서는 ①에서 푼 폴더를 Windows 탐색기로 열고, **주소 표시줄에 `powershell`을 입력**해 그 폴더에서 PowerShell을 실행합니다.
 
-**②-1** PC에서 압축을 풀고 그 폴더로 이동합니다.
-
-브라우저가 파일을 내려받은 곳은 **Windows의 다운로드 폴더**이고, 다음 단계의 `scp`는 **WSL 터미널**에서 실행합니다. 두 곳은 경로 표기가 달라, WSL의 `~/Downloads`에는 이 파일이 없습니다.
-
-```bash
-# PC(WSL)에서 — <사용자>는 Windows 계정 이름
-cd /mnt/c/Users/<사용자>/Downloads
-unzip converted_tflite.zip -d tm_model      # 없으면 sudo apt install -y unzip
-cd tm_model && ls
-```
-
-- `model_unquant.tflite`·`labels.txt` 두 파일이 보이면 → ②-2로 진행
-- `unzip: command not found`가 나오면 → 위 설치 명령을 실행한 뒤 **②-1을 다시** 수행
-- `converted_tflite.zip`이 보이지 않으면 → Windows 탐색기에서 실제 내려받기 위치를 확인하고 그 경로로 `cd`한 뒤 **②-1을 다시** 수행(탐색기에서 압축을 풀고 그 폴더로 `cd`해도 됩니다)
-
-**②-2** RPi5로 보냅니다.
-
-```bash
+```powershell
 scp model_unquant.tflite labels.txt 사용자명@192.168.0.__:~/ros2_ws/src/my_car_pkg/model/
 ```
 
-- RPi5에서 `ls ~/ros2_ws/src/my_car_pkg/model`로 **두 파일이 보이면** → ③으로 진행
-- **보내는 쪽**에서 `model_unquant.tflite: No such file or directory`가 나오면 → 현재 폴더에 두 파일이 있는지 `ls`로 확인하고 **②-1을 다시** 수행
-- **받는 쪽** 경로 오류(`scp: dest ... No such file`)가 나오면 → **①을 다시** 실행
-- 연결이 거부되면 → 주소·같은 네트워크 확인 후 **②-2를 다시** 실행
-- SSH가 어려우면 → VS Code 원격 탐색기(2.3)에서 파일을 끌어다 놓거나 USB 메모리로 복사
+- RPi5에서 `ls ~/ros2_ws/src/my_car_pkg/model`로 두 파일이 출력되면 → ③으로 진행
+- **보내는 쪽**에서 `No such file or directory`가 나오면 → PowerShell에서 `ls`로 두 파일이 현재 폴더에 있는지 확인하고 **`scp`를 다시** 실행
+- **받는 쪽** 경로 오류(`scp: dest ... No such file`)가 나오면 → 위 **`mkdir`을 다시** 실행
+- 연결이 거부되면 → 주소·같은 네트워크 확인 후 **`scp`를 다시** 실행
+- `scp`를 찾을 수 없다고 나오면 → USB 메모리로 복사하고 교수에게 알림
 
 **③ 패키지에 포함하기** — `setup.py`에 자료 파일 등록:
 
@@ -1125,14 +1141,31 @@ sudo apt install -y ros-jazzy-cv-bridge python3-opencv
 python3 -c "from ai_edge_litert.interpreter import Interpreter; print('ok')"
 ```
 
-- `ok`가 출력되면 → 10.2로 진행
+- `ok`가 출력되면 → 아래 **NumPy 버전 확인**으로 진행
 - `externally-managed-environment` 오류가 나오면 → `--break-system-packages`를 빠뜨린 것입니다. **①을 다시** 실행
 - `Retrying`·`Read timed out`·`Temporary failure in name resolution`이 나오면 → 외부망 접속 문제입니다. ①을 반복하지 말고 **③ 오프라인 설치**로 진행
 - `No matching distribution`이 나오면 → **③ 오프라인 설치**로 진행하고 교수에게 알림
 
+**NumPy 버전 확인** — `ok`가 출력된 뒤 수행합니다.
+
+```bash
+python3 -c "import numpy; print(numpy.__version__)"
+```
+
+- `1.`로 시작하면(예: `1.26.4`) → 10.2로 진행
+- `2.`로 시작하면 → 아래 명령으로 1.x로 낮춘 뒤 **위 버전 확인을 다시** 실행
+
+```bash
+pip3 install "numpy<2" --break-system-packages
+```
+
+- 실행기를 설치할 때 NumPy 2.x가 함께 설치되는 경우가 있습니다
+- `apt`로 설치한 `cv_bridge`·`python3-opencv`는 **NumPy 1.x 기준으로 빌드**되어 있어, 2.x 상태에서는 10.4의 노드가 `numpy` 관련 오류로 종료됩니다
+- 낮춘 뒤에도 `2.`로 출력되면 → 교수에게 알림
+
 **③ 오프라인 설치** — ②에서 외부망 문제로 설치가 진행되지 않은 경우에만 수행합니다.
 
-교수가 미리 받아 둔 설치 파일(`.whl`)을 USB 메모리 또는 `scp`(9.3 ②-2와 같은 방식)로 받은 뒤 실행합니다.
+교수가 미리 받아 둔 설치 파일(`.whl`)을 USB 메모리 또는 9.3 ②와 같은 방식(VS Code 탐색기로 끌어다 놓기)으로 받은 뒤, 그 파일이 있는 폴더에서 실행합니다.
 
 ```bash
 pip3 install ./ai_edge_litert-*.whl --break-system-packages
@@ -1316,6 +1349,7 @@ ros2 topic echo /sign_confidence
 |------|------|
 | `ModuleNotFoundError: ai_edge_litert` | **10.1 ①부터 다시** |
 | `ModuleNotFoundError: cv_bridge`·`cv2` | 10.1 ①의 `apt` 실행 → **빌드부터 다시** |
+| 메시지에 `NumPy`·`numpy`가 포함된 오류 | **10.1 ② NumPy 버전 확인** → `2.`이면 낮춘 뒤 **실행부터 다시** |
 | `Could not open ...` · `FileNotFoundError` | **9.3 ③** `data_files` 등록·파일 이름 확인 → **빌드부터 다시** |
 | `executable 'sign_classifier' not found` | 10.3 말미의 등록 확인 → **빌드부터 다시** |
 | `IndexError` (라벨 읽기) | `labels.txt`가 `0 stop` 형태인지 확인 → 다르면 **9.2에서 다시 내려받기** |
@@ -1684,7 +1718,7 @@ ros2 bag play run1                              # 재생
 
 | 순서 | 수행 위치 | 명령 |
 |:--:|------|------|
-| ① | PC → RPi5 | `scp -r run1 사용자명@192.168.0.__:~/` — 9.3 ②-2와 같은 방식 |
+| ① | PC → RPi5 | `run1` 폴더를 홈 폴더(`~`)로 옮김 — 9.3 ②-2(끌어다 놓기) 또는 ②-3(`scp -r run1 …:~/`) |
 | ② | RPi5 | `ros2 bag play run1 --loop` — 반복 재생 |
 | ③ | 다른 터미널 | `ros2 topic hz /camera/image_raw` |
 
