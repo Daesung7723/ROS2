@@ -438,7 +438,7 @@ ros2 run my_car_pkg image_check
 | 초록 | 40~80 |
 | 파랑 | 90~130 |
 
-> **자주 하는 실수 —** 빨강은 H 범위가 양끝 두 구간으로 나뉩니다. 한 범위만 쓰면 절반을 놓치므로 두 범위를 만들어 합쳐야 합니다. 실습에서는 이 문제가 없는 **초록·파랑을 권장**합니다.
+> **자주 하는 실수 —** 빨강은 H 범위가 양끝 두 구간으로 나뉩니다. 한 범위만 쓰면 절반을 놓치므로 두 범위를 만들어 합쳐야 합니다. 5장의 코드는 `h_min`을 `h_max`보다 크게 주면 두 범위를 합쳐 잡습니다(5.4 「색 값 정하기 ③」).
 
 ### 4.3 잡음 제거 — 모폴로지
 
@@ -575,12 +575,17 @@ class ColorTracker(Node):
 
         lower = np.array([h_min, s_min, v_min])                   # ⑥ 마스킹
         upper = np.array([h_max, 255, 255])
-        mask = cv2.inRange(hsv, lower, upper)
+        if h_min <= h_max:
+            mask = cv2.inRange(hsv, lower, upper)
+        else:                                                     # 빨강처럼 179와 0에 걸친 범위
+            m1 = cv2.inRange(hsv, lower, np.array([179, 255, 255]))
+            m2 = cv2.inRange(hsv, np.array([0, s_min, v_min]), upper)
+            mask = cv2.bitwise_or(m1, m2)                         # 두 구간 합치기
 
         kernel = np.ones((5, 5), np.uint8)                        # ⑦ 잡음 제거
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
 
-        m = cv2.moments(mask)                                     # ⑧ 무게중심
+        m = cv2.moments(mask, binaryImage=True)                   # ⑧ 무게중심
         point = Point()
         if m['m00'] > 500:                                        # ⑨ 대상 존재 판정
             point.x = m['m10'] / m['m00']
@@ -590,6 +595,10 @@ class ColorTracker(Node):
             point.x, point.y, point.z = -1.0, -1.0, 0.0           # 미검출 표시
 
         self.pub.publish(point)
+
+        rows, cols = hsv.shape[:2]                                # ⑩ 가운데 색 값 출력
+        self.get_logger().info(f'center HSV = {hsv[rows // 2, cols // 2]}',
+                               throttle_duration_sec=1.0)
 
 def main(args=None):
     rclpy.init(args=args)
@@ -610,8 +619,10 @@ def main(args=None):
 | ③ | 이미지 토픽 구독 — 구조는 Day 2 자료와 동일 |
 | ④ | 메시지를 OpenCV 이미지로 변환 |
 | ⑤~⑦ | 4장의 절차를 코드로 — 변환 → 마스킹 → 잡음 제거 |
+| ⑥ | `h_min`이 `h_max`보다 크면 **두 구간을 합쳐** 마스킹 — 179와 0에 걸친 빨강용 |
 | ⑧ | 무게중심 계산 |
 | ⑨ | **면적이 500 미만이면 미검출로 판정** — 작은 잡음을 대상으로 오인하지 않기 위함 |
+| ⑩ | 화면 가운데의 HSV 값을 1초마다 출력 — 물체의 색 값을 재는 용도(5.4) |
 
 **코드 읽기 — Python 문법 ① 클래스·객체**
 
@@ -631,13 +642,19 @@ def main(args=None):
 | `self.get_parameter('h_min').value` | 점 연결 — 메서드가 반환한 객체의 `.value` 속성을 이어서 읽음 |
 | `np.array([h_min, s_min, v_min])` | 리스트(대괄호)를 NumPy 배열로 변환 — OpenCV 함수의 입력 형식 |
 | `np.ones((5, 5), np.uint8)` | 괄호 안 괄호 `(5, 5)` = 튜플 하나 — 배열 크기를 한 인자로 전달 |
+| `cv2.moments(mask, binaryImage=True)` | 키워드 인자 — `True`면 흰 픽셀을 1로 셈 → `m00` = 픽셀 개수 |
 | `m['m00']` | 딕셔너리 키 접근 — `cv2.moments()`가 반환한 딕셔너리 |
+| `rows, cols = hsv.shape[:2]` | `shape` = (높이, 너비, 채널) · `[:2]` = 앞의 두 값만 잘라 동시 대입 |
+| `hsv[rows // 2, cols // 2]` | `//` = 정수 나눗셈 · [행, 열] 위치 픽셀의 H·S·V 세 값 |
 
 **코드 읽기 — Python 문법 ③ 흐름 제어**
 
 | 코드 | 뜻 |
 |------|------|
 | `if m['m00'] > 500:` … `else:` | 조건 분기 — 들여쓰기가 같은 줄까지가 한 블록 |
+| `if h_min <= h_max:` … `else:` | 범위가 0을 넘어가는지로 분기 — 빨강만 `else`로 감 |
+| `cv2.bitwise_or(m1, m2)` | 두 마스크 중 **하나라도 흰색**이면 흰색 — 두 구간 합치기 |
+| `info(..., throttle_duration_sec=1.0)` | 키워드 인자 — 1초에 한 번만 출력(매 프레임 출력 방지) |
 | `point.x, point.y, point.z = -1.0, -1.0, 0.0` | 동시 대입 — 왼쪽 세 곳에 오른쪽 세 값을 순서대로 |
 | `try:` … `except KeyboardInterrupt:` … `finally:` | Ctrl+C로 종료해도 `finally`의 정리 코드는 반드시 실행 |
 | `def main(args=None):` | 기본값 인자 — 호출 시 값을 주지 않으면 `None` |
@@ -665,7 +682,7 @@ ros2 run my_car_pkg color_tracker
 ros2 topic echo /target_point
 ```
 
-초록색 물체를 카메라 앞에서 움직이며 관찰합니다.
+기본값은 **초록** 범위입니다. 초록색 물체가 있으면 먼저 관찰하고, 다른 색 물체를 쓰려면 아래 「내 물체의 색 값 정하기」로 값을 정한 뒤 관찰합니다.
 
 - 터미널 ②에 `ModuleNotFoundError`(`cv2`·`cv_bridge`)가 나오면 → 5.1의 설치 명령을 실행하고 `package.xml` 선언까지 확인한 뒤 **빌드부터 다시** 실행
 - 터미널 ③에 아무것도 출력되지 않으면 → 터미널 ①의 카메라 노드가 실행 중인지 확인(2.4) 후 **터미널 ②부터 다시** 실행
@@ -678,7 +695,59 @@ ros2 topic echo /target_point
 | 대상을 **가까이** | z(면적)가 커짐 |
 | 대상을 치움 | x = -1.0 (미검출) |
 
-**색 범위 조정** — 대상을 비춰도 x = -1.0만 나오면 코드를 고치지 말고 파라미터를 바꿉니다:
+**내 물체의 색 값 정하기 ① — 물체 고르기**
+
+| 조건 | 이유 |
+|------|------|
+| **단색** | 여러 색이 섞이면 한 범위로 잡히지 않음 |
+| **무광** | 반사광 부분은 흰색이 되어 마스크에서 빠짐 |
+| **배경과 다른 색** | 같은 색 배경은 함께 잡혀 구분 불가 |
+| 손바닥 크기 | 너무 작으면 면적 500 미만 = 미검출 |
+
+- 모양은 상관없습니다 — 색만 보고 찾습니다(속이 빈 고리 모양은 점이 빈 곳에 찍힘)
+
+**내 물체의 색 값 정하기 ② — 값 재기**
+
+1. 물체를 **화면 가운데**에 크게 비춤
+2. 터미널 ②에 1초마다 출력되는 값을 읽음 — 예: `center HSV = [ 62 180 140]` → H 62 · S 180 · V 140
+3. 아래 표로 파라미터를 계산
+
+| 파라미터 | 정하는 법 | 예 (H 62 · S 180 · V 140) |
+|------|------|:--:|
+| `h_min` · `h_max` | H − 10 · H + 10 | 52 · 72 |
+| `s_min` | S의 절반 (50보다 작으면 50) | 90 |
+| `v_min` | V의 절반 (40보다 작으면 40) | 70 |
+
+- V를 절반으로 잡는 이유 — **그늘에서는 V가 절반으로 떨어집니다**(4.2)
+- 출력값이 매번 크게 달라지면 → 물체가 가운데에서 벗어났거나 반사광이 비친 상태 → 물체를 옮기고 **2부터 다시**
+
+**내 물체의 색 값 정하기 ③ — 빨강(H가 0 근처)**
+
+H는 179 다음이 0으로 이어집니다. 계산 결과가 0보다 작거나 179보다 크면 **180을 더하거나 빼서** 넣습니다.
+
+| 측정 H | 계산 | 넣는 값 |
+|:--:|------|------|
+| 4 | 4 − 10 = −6 → **174** · 4 + 10 = 14 | `h_min 174` · `h_max 14` |
+| 175 | 175 − 10 = 165 · 175 + 10 = 185 → **5** | `h_min 165` · `h_max 5` |
+
+- `h_min`이 `h_max`보다 크면 코드 ⑥이 **두 구간을 합쳐** 잡습니다(5.3)
+
+**내 물체의 색 값 정하기 ④ — 시작 값 참고**
+
+재기 전에 먼저 넣어 볼 값입니다.
+
+| 색 | `h_min` | `h_max` |
+|------|:--:|:--:|
+| 빨강 | 170 | 10 |
+| 주황 | 10 | 20 |
+| 노랑 | 20 | 35 |
+| 초록 (기본값) | 40 | 80 |
+| 파랑 | 90 | 130 |
+
+- `s_min 80` · `v_min 60`은 공통 시작 값
+- 파랑에 하늘색이 함께 잡히면 → `h_min`을 100으로 올리고 **다시** 확인
+
+**색 범위 조정** — 정한 값을 실행 중인 노드에 넣습니다(코드 수정 없음). 대상을 비춰도 x = -1.0만 나오면 값을 다시 조정합니다:
 
 ```bash
 ros2 param set /color_tracker h_min 35
@@ -855,7 +924,7 @@ ros2 run image_view image_saver --ros-args -r image:=/mask_view \
 
 - 위 세 설정은 **Advanced**를 펼쳐야 표시됩니다 — 기본 화면에는 **Train Model** 버튼만 있습니다. 오늘은 값을 바꾸지 않으므로 펼치지 않아도 됩니다
 - **1~3분** 소요 — 이 대기 시간에 8.2를 진행합니다
-- 학습 중에는 **브라우저 탭을 유지**해야 함 — 다른 탭으로 이동해도 되지만 창을 닫으면 처음부터 다시 수행
+- 학습이 끝날 때까지 **이 탭을 화면에 띄운 상태로 유지**해야 함 — 다른 탭으로 이동하면 브라우저가 학습을 늦추거나 멈추고, 창을 닫으면 처음부터 다시 수행
 - 진행 막대가 멈춘 채 5분이 지나면 → 탭을 새로 고치지 말고 교수에게 알림(새로 고치면 촬영분이 사라집니다)
 
 ### 8.2 왜 1~3분 만에 끝나는가
@@ -974,7 +1043,7 @@ Teachable Machine의 **Export Model** → **Tensorflow Lite** 탭:
 mkdir -p ~/ros2_ws/src/my_car_pkg/model
 ```
 
-- 폴더가 없으면 다음 단계의 `scp`가 **파일명을 폴더 이름으로 해석**해 엉뚱한 곳에 저장됩니다
+- 폴더가 없으면 다음 단계의 `scp`가 **경로 오류로 실패**합니다
 
 **②-1** PC에서 압축을 풀고 그 폴더로 이동합니다.
 
@@ -1376,7 +1445,7 @@ self.stable_pub.publish(String(data=self.confirmed))
 | 조각 | 넣을 위치 |
 |------|------|
 | `# __init__` 4줄 | `self.conf_pub = self.create_publisher(...)` **다음 줄**에 **같은 들여쓰기**로 |
-| `# infer 말미` 8줄 | `self.conf_pub.publish(Float32(data=conf))` **다음 줄**에 **같은 들여쓰기**로 |
+| `# infer 말미` 9줄 | `self.conf_pub.publish(Float32(data=conf))` **다음 줄**에 **같은 들여쓰기**로 |
 
 - `if len(self.history) == n and ...` 안쪽의 `if`는 **한 단 더** 들여씁니다(들여쓰기 3단). 한 칸만 어긋나도 `IndentationError`가 나거나 다른 메서드에 속하게 됩니다
 
@@ -1545,13 +1614,13 @@ sudo apt install -y ros-jazzy-image-view
 ```bash
 # RPi5에서 — 현재 폴더에 저장됨
 ros2 run image_view image_saver --ros-args -r image:=/camera/image_raw \
-  -p filename_format:="stop_%04d.jpg" -p save_all_images:=true
+  -p filename_format:="stop_%04d.jpg" -p save_all_image:=true
 ```
 
 - `ls *.jpg`로 파일이 보이면 → ③으로 진행
 - `Package 'image_view' not found`가 나오면 → **①을 다시** 실행
 - 파일이 생기지 않으면 → 터미널 ①의 카메라 노드가 실행 중인지 확인(2.4) 후 **②를 다시** 실행
-- `save_all_images:=false`로 두면 **서비스를 호출할 때만 한 장씩** 저장됩니다
+- `save_all_image:=false`로 두면 **서비스를 호출할 때만 한 장씩** 저장됩니다
 
 **③** 저장한 사진을 PC로 옮겨 Teachable Machine의 **Upload** 탭으로 올립니다.
 
@@ -1577,6 +1646,11 @@ ros2 run image_view image_saver --ros-args -r image:=/camera/image_raw \
 ### 14.4 추론 결과를 영상에 표시
 
 ```python
+# __init__에 추가
+self.debug_pub = self.create_publisher(Image, '/debug_view', 10)
+
+# infer 말미에 추가
+frame = self.latest.copy()                  # 원본을 건드리지 않도록 복사
 cv2.putText(frame, f'{name} {conf:.2f}', (10, 30),
             cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
 self.debug_pub.publish(self.bridge.cv2_to_imgmsg(frame, 'bgr8'))
