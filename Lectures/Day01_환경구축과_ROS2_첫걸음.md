@@ -73,7 +73,7 @@
 | Raspberry Pi 5 | 전원 어댑터(5V/5A 권장)·방열 대책 |
 | microSD 카드 | 32GB 이상·리더기 |
 | 카메라 모듈 | **CSI**(Camera Serial Interface) 방식 — RPi 전용이라 PC에는 연결되지 않음 |
-| 초음파센서 HC-SR04 · DC모터 · 모터 드라이버(L298N) | Day 6 |
+| 초음파센서 HC-SR04 · 차량 키트 PiCar-R5(DC모터 · 제어보드[모터 드라이버 DRV8835] · 배터리) | Day 6 |
 
 > **RPi5 환경 구축은 Day 4 전 과제입니다.** 오늘 진행한 절차의 반복이므로 각자 수행합니다.
 

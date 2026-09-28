@@ -12,7 +12,7 @@
 2. [RPi5 GPIO 구조](#2-rpi5-gpio-구조)
 3. [실습 ① — 초음파 센서 결선](#3-실습---초음파-센서-결선)
 4. [실습 ② — 거리 퍼블리셔](#4-실습---거리-퍼블리셔)
-5. [DC모터와 L298N](#5-dc모터와-l298n)
+5. [DC모터와 모터 드라이버](#5-dc모터와-모터-드라이버)
 6. [실습 ③ — 모터 결선과 동작 확인](#6-실습---모터-결선과-동작-확인)
 7. [실습 ④ — 모터 제어 노드](#7-실습---모터-제어-노드)
 8. [미니프로젝트 — 수동 주행 차량](#8-미니프로젝트--수동-주행-차량)
@@ -62,8 +62,8 @@ Day 4·5에서는 RPi5의 **카메라 영상과 AI 분류**를 다루었습니�
 | 오전 | ① GPIO | 2 | RPi5 GPIO 구조 · gpiozero | 핀 번호 읽는 법 |
 | 오전 | ② 초음파 결선 | 3 | HC-SR04 원리 · 분압 · 결선 · 통전 확인 | 동작하는 센서 |
 | 오전 | ③ 거리 퍼블리셔 | 4 | `DistMsg` 정의 · `us_node` · **turtlesim으로 확인** | `/us_dist` 발행 · 반응하는 turtle |
-| 오후 | ④ 모터 이론 | 5 | DC모터 · PWM · L298N · 전원 설계 | 결선 계획 |
-| 오후 | ⑤ 모터 결선 | 6 | 결선 · 점검 · 단품 통전 확인 · **동작 함수** | 4방향 동작이 확인된 차량 |
+| 오후 | ④ 모터 이론 | 5 | DC모터 · PWM · 모터 드라이버(DRV8835) · 전원 | 모터 핀 구조 이해 |
+| 오후 | ⑤ 모터 결선 | 6 | 제어보드 핀 · 점검 · 단품 통전 확인 · **동작 함수** | 4방향 동작이 확인된 차량 |
 | 오후 | ⑥ 모터 노드 | 7 | `/cmd_vel` → 좌우 바퀴 변환 · 확인 5항 | `motor_node` |
 | 오후 | ⑦ 미니프로젝트 | 8 | 키보드 수동 주행 | **움직이는 차량** |
 
@@ -132,7 +132,7 @@ sudo apt install -y python3-gpiozero python3-lgpio
 python3 -c "import gpiozero; print('ok')"      # 설치 확인
 ```
 
-- gpiozero의 방식 — 핀 신호를 직접 다루지 않고 **부품 이름의 클래스**를 사용: `DistanceSensor`(초음파)·`Motor`(모터)·`LED` 등
+- gpiozero의 방식 — 핀 신호를 직접 다루지 않고 **부품 이름의 클래스**를 사용: `DistanceSensor`(초음파)·`LED` 등. 모터는 방향 핀과 속도 핀에 값을 지정하는 `DigitalOutputDevice`·`PWMOutputDevice`로 구동합니다(6.3)
 - 인터넷 예제 중 `RPi.GPIO` 기반 코드는 RPi5에서 실행되지 않음 — **검색 결과를 선별하는 기준**으로 기억해 둘 것
 
 ### 2.3 확인 활동 — 개념 점검
@@ -599,9 +599,34 @@ ros2 topic echo /turtle1/cmd_vel
 | 3 | turtle 대신 모터가 움직이게 하려면 `dist_turtle`의 코드를 고쳐야 하는가? | 교체 가능 — 행동 노드만 교체, 이름 차이는 remapping |
 | 4 | 물체가 200cm보다 멀리 있을 때 turtle은? | 4.4 상한 처리 — 기준 이상이므로 전진 |
 
+**확장 과제 — 가까워지면 방향을 바꾸어 계속 주행**
+
+Day 3 자료 9장 미로 주행에서 벽을 검출하면 방향을 바꾸었던 것처럼, 거리가 기준 이하가 되면 turtle을 **180° 회전**시킨 뒤 다시 전진시킵니다. `dist_turtle`을 복사한 새 노드로 작성합니다.
+
+| 상태 | 들어가는 조건 | 발행하는 명령 |
+|------|------|------|
+| 전진 | 시작 · 회전 완료 | `linear.x` = `speed` |
+| 회전 | 전진 중 거리가 `stop_cm` 이하 | `angular.z` = 회전 속도 — 회전 시간 동안 거리 값과 무관 |
+
+- **상태 변수 하나**(`'RUN'`·`'TURN'`)에 현재 동작을 저장합니다 — Day 3 자료 9.2의 상태 기계에서 후진(BACK)을 뺀 구조입니다
+- 180° = π(약 3.14) rad — `angular.z` = 1.57(rad/s)로 2초 동안 명령하면 약 180° 회전합니다
+- 거리 값은 10Hz로 도착하므로 **콜백 20회 ≈ 2초** — 회전을 시작할 때 계수를 0으로 두고 콜백마다 1씩 더해 회전 시간을 측정합니다(Day 3 자료 9.2의 틱 계수)
+- 회전하는 동안에도 거리 값은 계속 도착합니다 — **회전 상태에서는 거리 판단을 건너뛰어야** 회전이 끝까지 진행됩니다
+
+**확장 과제 — 확인**
+
+| 확인 | 정상 동작 |
+|------|------|
+| 손을 20cm 안으로 가져감 | turtle이 제자리에서 회전한 뒤 반대 방향으로 전진 |
+| 회전 중에 손을 치움 | 회전이 끝날 때까지 계속 회전 |
+| `ros2 param set`으로 `stop_cm` 변경 | 반응 거리가 바뀜 — 재실행 없이 |
+
+- 회전이 끝나지 않고 계속 이어지면 → 회전 중에도 거리 판단이 실행됩니다. 회전 상태일 때 판단을 건너뛰는지 확인하고 **빌드부터 다시** 실행
+- 회전 각도가 180°보다 크거나 작으면 → 회전 속도 또는 콜백 횟수를 조정하고 **빌드부터 다시** 실행
+
 ---
 
-## 5. DC모터와 L298N
+## 5. DC모터와 모터 드라이버
 
 ### 5.1 DC모터 — 방향과 속도
 
@@ -612,7 +637,7 @@ DC모터의 제어 요소는 둘뿐입니다.
 | **회전 방향** | 전류의 방향 — 두 단자의 극성을 바꾸면 역회전 |
 | **회전 속도** | 공급 전력의 크기 — 전압(평균)이 높을수록 빠름 |
 
-- 문제 ① — GPIO 핀은 모터를 돌릴 만한 전류를 내지 못함 → **별도 전원 + 중간 스위치 회로** 필요(5.3 L298N)
+- 문제 ① — GPIO 핀은 모터를 돌릴 만한 전류를 내지 못함 → **별도 전원 + 중간 스위치 회로** 필요(5.3 모터 드라이버)
 - 문제 ② — GPIO는 3.3V 켬/끔 두 상태뿐, 중간 전압이 없음 → **PWM**으로 평균을 만듦(5.2)
 
 ### 5.2 PWM — 켬·끔의 비율로 평균을 만들기
@@ -627,116 +652,133 @@ DC모터의 제어 요소는 둘뿐입니다.
 | 0% | 0 | 정지 |
 
 - 전환이 초당 수백~수천 회로 빠르므로 모터는 **평균값으로 동작** — 깜빡임이 아니라 속도 조절이 됨
-- gpiozero에서는 `motor.forward(0.5)`처럼 **0.0~1.0의 값**으로 지정 — 내부에서 PWM으로 변환됨
+- gpiozero에서는 `PWMOutputDevice`의 `value`에 `0.5`처럼 **0.0~1.0의 값**을 대입 — 내부에서 PWM으로 변환됨(6.3)
 
-### 5.3 L298N — H-브리지 드라이버
+### 5.3 모터 드라이버 — H-브리지와 DRV8835
 
-**L298N** = 방향 전환(H-브리지)과 전류 증폭을 담당하는 **모터 드라이버 보드**. 모터 2개를 독립 제어합니다.
+**모터 드라이버** = 모터의 방향 전환(H-브리지)과 전류 공급을 담당하는 회로. GPIO는 **신호만** 보내고, 모터에 흐르는 전류는 드라이버가 배터리 전원에서 공급합니다.
 
 **H-브리지** = 스위치 4개를 H자 모양으로 배치한 회로 — 켜는 쌍에 따라 모터에 흐르는 전류의 방향이 바뀝니다.
 
-| IN1 | IN2 | 모터 A |
+| 켜는 스위치 쌍 | 모터에 흐르는 전류 | 모터 |
 |:--:|:--:|------|
-| 켬 | 끔 | 정회전 |
-| 끔 | 켬 | **역회전** |
-| 끔 | 끔 | 정지 |
+| 왼쪽 위 · 오른쪽 아래 | 왼쪽 → 오른쪽 | 정회전 |
+| 오른쪽 위 · 왼쪽 아래 | 오른쪽 → 왼쪽 | **역회전** |
+| 모두 끔 | 없음 | 정지 |
 
-| L298N 단자 | 역할 |
-|------|------|
-| IN1·IN2 / IN3·IN4 | 모터 A / B의 **방향** 지정 — GPIO 출력 연결 |
-| **ENA / ENB** | 모터 A / B의 **속도** — PWM 신호 연결(점퍼 제거 후) |
-| OUT1·2 / OUT3·4 | 모터 A / B 단자 |
-| +12V · GND | **배터리 전원** 입력 |
+**DRV8835** = H-브리지를 내장한 **모터 드라이버 칩**. 실습 차량(PiCar-R5)의 **제어보드**에 실장되어 있습니다.
 
-### 5.4 전원 설계 — 분리와 공통 GND
+| DRV8835 입력 | 역할 | 값 |
+|------|------|:--:|
+| **방향(DIR)** | 켤 스위치 쌍을 선택 — 전류의 방향 = **회전 방향** | 0 또는 1 |
+| **속도(PWM)** | 켜져 있는 시간의 비율 = **회전 속도**(5.2) | 0.0~1.0 |
+
+- 모터 하나에 방향 핀 1개 + 속도 핀 1개 — 모터 4개에 GPIO 8개를 사용합니다(6.1)
+- 모터는 제어보드의 모터 연결 단자에 연결하고, 제어보드는 RPi5 위에 겹쳐 장착합니다 — GPIO와 드라이버 사이의 배선은 제어보드가 담당합니다
+
+### 5.4 전원 — 모터 전류의 경로와 공통 GND
 
 > **모터 전원을 RPi5에서 끌어오지 않습니다**
 >
-> 모터는 기동 순간 큰 전류를 소비합니다. RPi5의 5V 핀에서 공급하면 **전압이 순간 강하해 RPi5가 재부팅**될 수 있습니다(10.4). 모터 전원은 **전용 배터리**로 분리합니다.
+> 모터는 기동 순간 큰 전류를 소비합니다. RPi5의 5V 핀에서 공급하면 **전압이 순간 강하해 RPi5가 재부팅**될 수 있습니다(10.4). 모터 전류는 **배터리**에서 모터 드라이버를 거쳐 공급합니다.
 
 | 전원 | 공급 대상 |
 |------|------|
-| 배터리 (7~12V) | L298N +12V 단자 → 모터 |
-| RPi5 어댑터 | RPi5 본체 |
-| L298N 보드 로직 | 온보드 5V 생성(점퍼 유지) — RPi5 5V와 연결하지 않음 |
+| 7.4V 배터리 (키트 구성품) | 제어보드 → 모터 드라이버(DRV8835) → 모터 4개 |
+| RPi5 전원 | 교재 10.2 「자율주행 자동차 전원 켜기」의 방식을 따름 |
 
-- **GND는 반드시 공통** — 배터리 GND·L298N GND·RPi5 GND를 한데 연결. 기준점이 다르면 GPIO 신호를 L298N이 읽지 못함
-- 전원은 둘이지만 **기준점은 하나** — 오늘 배선에서 가장 자주 빠뜨리는 연결이 이 GND입니다
+- 제어보드의 **전원 스위치**(ON/OFF)로 배터리 전원을 켜고 끕니다 — 연결 작업은 스위치를 끈 상태에서 합니다
+- **GND는 공통** — 모터 드라이버와 RPi5의 기준점(GND)이 같아야 GPIO 신호가 드라이버에 전달됩니다. 이 차량은 제어보드가 RPi5 위에 겹쳐 장착되므로 기준점을 잇는 배선을 따로 하지 않습니다
+- 모터 드라이버를 별도 보드로 배선하는 차량에서는 이 GND 연결을 가장 자주 빠뜨립니다
 
 ### 5.5 확인 활동 — 개념 점검
 
-결선에 들어가기 전 확인합니다.
+결선에 들어가기 전 구두로 확인합니다.
 
 | # | 질문 | 확인하려는 것 |
 |:--:|------|------|
-| 1 | 모터의 회전 방향은 무엇으로 바꾸는가? | 5.1 — 전류 방향(IN1·IN2 조합) |
+| 1 | 모터의 회전 방향은 무엇으로 바꾸는가? | 5.1·5.3 — 전류 방향(방향 핀의 0·1) |
 | 2 | GPIO가 중간 전압을 내지 못하면서도 속도를 조절할 수 있는 이유는? | 5.2 — PWM 듀티 사이클 |
 | 3 | 모터 전원을 RPi5 5V에서 공급하면 생기는 문제는? | 5.4 — 전압 강하·재부팅 |
-| 4 | 전원을 분리하면서도 GND를 공통으로 연결하는 이유는? | 5.4 — 신호 기준점 공유 |
-| 5 | ENA의 점퍼를 제거하는 이유는? | 5.3 — PWM 신호를 연결하기 위해 |
+| 4 | 모터 드라이버와 RPi5의 GND가 같아야 하는 이유는? | 5.4 — 신호 기준점 공유 |
+| 5 | 모터 하나에 GPIO 핀이 2개 필요한 이유는? | 5.3 — 방향(0·1)과 속도(PWM)를 따로 지정 |
 
 ---
 
 ## 6. 실습 ③ — 모터 결선과 동작 확인
 
-### 6.1 결선표
+### 6.1 제어보드의 모터 핀
 
-**전원을 모두 분리한 상태**에서 연결합니다. 왼쪽 모터 = A(OUT1·2), 오른쪽 모터 = B(OUT3·4).
+**제어보드 전원 스위치를 끈 상태**에서 모터 4개를 제어보드의 모터 연결 단자에 연결합니다. 실습 차량(PiCar-R5)의 제어보드에는 모터 드라이버 **DRV8835**(5.3)가 있고, 모터 하나에 **방향 핀(DIR) 1개와 속도 핀(PWM) 1개**를 사용합니다.
 
-| L298N | 연결 | 대상 (BCM) |
-|:--:|:--:|:--:|
-| IN1 | → | **GPIO17** (왼쪽 방향 ①) |
-| IN2 | → | **GPIO27** (왼쪽 방향 ②) |
-| ENA | → | **GPIO12** (왼쪽 속도 — PWM) |
-| IN3 | → | **GPIO5** (오른쪽 방향 ①) |
-| IN4 | → | **GPIO6** (오른쪽 방향 ②) |
-| ENB | → | **GPIO13** (오른쪽 속도 — PWM) |
-| OUT1·OUT2 | → | 왼쪽 모터 두 단자 |
-| OUT3·OUT4 | → | 오른쪽 모터 두 단자 |
-| +12V | → | 배터리 **+** |
-| GND | → | 배터리 **−** **그리고 RPi5 GND** (공통 — 5.4) |
+| 모터 | 위치 | 방향(DIR) | 속도(PWM) |
+|:--:|:--:|:--:|:--:|
+| 모터 1 | 왼쪽 앞 | GPIO18 | GPIO19 |
+| 모터 3 | 왼쪽 뒤 | GPIO22 | GPIO23 |
+| 모터 2 | 오른쪽 앞 | GPIO20 | GPIO21 |
+| 모터 4 | 오른쪽 뒤 | GPIO24 | GPIO25 |
 
-- GPIO12·13을 속도(EN)에 배정한 이유 — RPi5에서 **PWM에 적합한 핀**
-- ENA·ENB의 **점퍼 캡을 제거**한 뒤 연결(5.3) — 점퍼가 있으면 항상 최고 속도로 고정됨
+- 방향 핀 = 0 또는 1 — 값을 바꾸면 회전 방향이 반대가 됨 / 속도 핀 = PWM 0.0~1.0(5.2)
+- 핀 번호 출처 = 교재 10.5 「DC 모터 제어」 · 모터 위치 = 교재 10.1 조립 그림
+- 교재 표에서 앞으로 도는 방향 값은 **왼쪽 1 · 오른쪽 0**입니다 — 좌우가 서로 반대입니다. 6.3 스크립트의 `LEFT_FWD`·`RIGHT_FWD`가 이 값입니다
+- 같은 쪽 두 모터(왼쪽 = 모터 1·3 · 오른쪽 = 모터 2·4)에는 같은 값을 줍니다 — 좌우의 속도 차로 방향을 바꿉니다(7.1 차동 구동)
 
 ### 6.2 육안 점검
 
 | # | 점검 |
 |:--:|------|
-| 1 | 배터리 **극성** — +가 +12V 단자에 (역결선은 보드 손상 위험) |
-| 2 | **공통 GND** — 배터리·L298N·RPi5의 GND가 이어져 있는가 |
-| 3 | ENA·ENB **점퍼 제거** 후 GPIO12·13 연결 |
-| 4 | 모터 단자가 OUT에, **GPIO 핀에 직접 연결된 모터가 없는가** |
-| 5 | 좌우 모터가 A·B에 뒤바뀌지 않았는가 (차체 기준 왼쪽 = A) |
+| 1 | **제어보드 전원 스위치 = OFF** · 배터리 연결잭이 제어보드에 끝까지 연결되었는가 |
+| 2 | 제어보드가 RPi5의 40핀 헤더에 **한 줄 밀림 없이** 끝까지 장착되었는가 |
+| 3 | 모터 4개가 제어보드의 모터 연결 단자에 연결되었는가 · **GPIO 핀에 직접 연결된 모터가 없는가** |
+| 4 | 좌우 모터가 뒤바뀌지 않았는가 (차체 기준 왼쪽 = 모터 1·3 · 오른쪽 = 모터 2·4 — 교재 10.1 그림과 대조) |
 
 > **파손 위험 항목**
 >
-> - **배터리 역결선** — L298N 손상
+> - **제어보드를 한 줄 밀린 상태로 장착** — 전원 핀이 다른 핀에 연결되어 보드가 손상될 수 있음
 > - **모터를 GPIO에 직결** — RPi5 손상
-> - 통전 확인은 **차체를 들어 바퀴를 공중에 띄운 상태**에서 — 예상과 다르게 회전해도 사고가 없도록
+> - 통전 확인은 **차체를 들어 바퀴를 공중에 띄운 상태**에서 수행합니다 — 예상과 다르게 회전해도 사고가 없도록
 
 ### 6.3 통전 확인 — 단품 스크립트
 
-배터리·RPi5 전원을 연결하고, **바퀴를 공중에 띄운 상태**에서 실행합니다.
+6.1의 핀으로 모터 4개를 ROS2 없이 먼저 구동합니다. 배터리를 연결하고 제어보드 전원을 켠 뒤 **바퀴를 공중에 띄운 상태**에서 실행합니다. 초음파 노드(`us_node`)가 실행 중이면 먼저 `Ctrl+C`로 종료합니다 — 초음파 핀(GPIO23·24)이 모터 3·4의 핀과 겹칩니다.
 
 `~/motor_test.py`:
 
 ```python
-from gpiozero import Motor               # 모터 클래스 — 방향 핀 2 + 속도(PWM) 핀 1
+from gpiozero import DigitalOutputDevice, PWMOutputDevice   # 방향 = 0/1 출력 · 속도 = PWM 출력
 from time import sleep
 
-left  = Motor(forward=17, backward=27, enable=12)
-right = Motor(forward=5,  backward=6,  enable=13)
+L_DIR = [DigitalOutputDevice(18), DigitalOutputDevice(22)]  # 왼쪽 = 모터 1·3
+L_PWM = [PWMOutputDevice(19), PWMOutputDevice(23)]
+R_DIR = [DigitalOutputDevice(20), DigitalOutputDevice(24)]  # 오른쪽 = 모터 2·4
+R_PWM = [PWMOutputDevice(21), PWMOutputDevice(25)]
 
-left.forward(0.5);  right.forward(0.5);  sleep(2)    # ① 전진 (절반 속도)
-left.stop();        right.stop();        sleep(1)
-left.backward(0.5); right.backward(0.5); sleep(2)    # ② 후진
-left.stop();        right.stop();        sleep(1)
-left.backward(0.5); right.forward(0.5);  sleep(1)    # ③ 제자리 좌회전 — 왼쪽 뒤로·오른쪽 앞으로
-left.stop();        right.stop();        sleep(1)
-left.forward(0.5);  right.backward(0.5); sleep(1)    # ④ 제자리 우회전 — 왼쪽 앞으로·오른쪽 뒤로
-left.stop();        right.stop()                     # ⑤ 정지
+LEFT_FWD, RIGHT_FWD = 1, 0          # 앞으로 도는 방향 값 — 교재 표(왼쪽 1 · 오른쪽 0)
+LB, RB = 1 - LEFT_FWD, 1 - RIGHT_FWD   # 뒤로 도는 방향 값 = 반대 값
+
+def drive(l_dir, l_speed, r_dir, r_speed):    # 한쪽 모터 2개에 같은 값을 설정
+    for d in L_DIR:
+        d.value = l_dir
+    for p in L_PWM:
+        p.value = l_speed
+    for d in R_DIR:
+        d.value = r_dir
+    for p in R_PWM:
+        p.value = r_speed
+
+drive(LEFT_FWD, 0.5, RIGHT_FWD, 0.5); sleep(2)   # ① 전진 (절반 속도)
+drive(LEFT_FWD, 0.0, RIGHT_FWD, 0.0); sleep(1)
+drive(LB, 0.5, RB, 0.5);              sleep(2)   # ② 후진
+drive(LEFT_FWD, 0.0, RIGHT_FWD, 0.0); sleep(1)
+drive(LB, 0.5, RIGHT_FWD, 0.5);       sleep(1)   # ③ 제자리 좌회전 — 왼쪽 뒤로·오른쪽 앞으로
+drive(LEFT_FWD, 0.0, RIGHT_FWD, 0.0); sleep(1)
+drive(LEFT_FWD, 0.5, RB, 0.5);        sleep(1)   # ④ 제자리 우회전 — 왼쪽 앞으로·오른쪽 뒤로
+drive(LEFT_FWD, 0.0, RIGHT_FWD, 0.0)             # ⑤ 정지 — 속도 0
 ```
+
+> **Tip**
+>
+> 교재 10.5는 좌·우회전을 **한쪽 모터만 정지**시키는 방식으로 설명합니다. 이 자료는 한쪽을 뒤로 돌리는 **제자리 회전**을 사용합니다 — 모터마다 방향 핀이 따로 있어 두 방식 모두 가능합니다.
 
 ```bash
 python3 motor_test.py
@@ -753,14 +795,16 @@ python3 motor_test.py
 - 공중 시험이므로 차체는 움직이지 않습니다 — **바퀴의 회전 방향**을 표의 「왼쪽 바퀴」·「오른쪽 바퀴」 열과 대조합니다
 
 - ①~⑤가 표대로 동작하면 → **단품 정상** · 6.4로 진행
-- 한쪽이 **반대로** 회전하면 → 그 모터의 두 단자가 뒤바뀐 것입니다. **전원을 분리하고** OUT 두 선을 교환한 뒤 **다시** 실행
-- ①②는 정상이지만 ③④의 좌우가 서로 바뀌면 → 좌우 모터가 A·B에 바뀌어 연결된 상태입니다(점검 5). **전원을 분리하고** 두 모터의 OUT 연결을 좌우 교환한 뒤 **다시** 실행
-- 한쪽만 회전하면 → IN·EN 배선 누락 또는 점퍼 미제거입니다. **전원을 분리하고 6.1·점검 3**을 확인한 뒤 **다시** 실행
-- 아무 반응이 없으면 → 배터리·공통 GND 미연결입니다. **전원을 분리하고 점검 1·2**를 확인한 뒤 **다시** 실행
-- 회전하다 **RPi5가 재부팅**되면 → 모터 전원이 RPi5에서 공급되고 있습니다. **즉시 전원을 분리하고 5.4**(전원 분리)를 다시 확인 — 이 상태로 계속 실행하지 않습니다
+- **한쪽 바퀴 2개가 함께** 반대로 회전하면 → 이 차량의 방향 값이 교재 표와 반대입니다. 왼쪽이면 `LEFT_FWD`, 오른쪽이면 `RIGHT_FWD` 값을 0↔1로 바꾸어 **다시** 실행 — 바꾼 값은 6.4·7장에서도 그대로 사용합니다
+- **바퀴 1개만** 반대로 회전하면 → 그 모터의 두 선(DC+·DC−)이 교재 10.5 그림과 반대로 연결된 상태입니다(같은 쪽 두 모터가 방향 값 하나를 공유하므로 코드로는 보정하지 않습니다). **전원을 끄고** 그 모터의 연결을 교재 그림과 대조한 뒤 **다시** 실행
+- ①②는 정상이지만 ③④의 좌우가 서로 바뀌면 → 좌우 모터가 제어보드의 모터 연결 단자에 바뀌어 연결된 상태입니다. **전원을 끄고** 모터 1·3 = 왼쪽 · 모터 2·4 = 오른쪽을 교재 그림과 대조한 뒤 **다시** 실행
+- 바퀴 1개만 회전하지 않으면 → **전원을 끄고** 그 모터의 연결 단자를 확인한 뒤 **다시** 실행
+- 아무 반응이 없으면 → 제어보드 전원 스위치(ON/OFF)와 배터리 연결을 확인한 뒤 **다시** 실행
+- 실행 직후 GPIO 사용 오류가 나오면 → 초음파 노드가 실행 중입니다. `us_node`를 `Ctrl+C`로 종료하고 **다시** 실행
+- 회전하다 **RPi5가 재부팅**되면 → **즉시 제어보드 전원을 끄고** 교수에게 알림 — 이 상태로 계속 실행하지 않습니다
 - 위 조치로도 동작하지 않으면 → 교수에게 알림
 
-- **여기서 방향이 맞아야 6.4·7장의 코드가 성립** — 단품에서 네 동작의 방향을 확정해 두면 노드의 오동작 원인에서 배선을 제외할 수 있습니다
+- **여기서 방향이 맞아야 6.4·7장의 코드가 성립** — 단품에서 네 동작의 방향과 `LEFT_FWD`·`RIGHT_FWD` 값을 확정해 두면 노드의 오동작 원인에서 배선을 제외할 수 있습니다
 
 ### 6.4 동작 함수 노드 — 전진·후진·좌회전·우회전
 
@@ -774,8 +818,8 @@ python3 motor_test.py
 | `turn_right()` | 앞 | 뒤 |
 | `stop()` | 정지 | 정지 |
 
-- 6.3 스크립트는 명령을 한 줄씩 나열했습니다 — 함수로 묶으면 **동작의 이름으로 호출**할 수 있습니다
-- 7장의 모터 제어 노드는 이 네 함수를 **공식 하나로 일반화**합니다(7.1)
+- 6.3 스크립트에는 명령이 한 줄씩 나열되어 있습니다 — 함수로 묶으면 **동작의 이름으로 호출**할 수 있습니다
+- 7장의 모터 제어 노드에서는 이 네 함수를 **공식 하나로 일반화**합니다(7.1)
 
 **설계**
 
@@ -783,8 +827,9 @@ python3 motor_test.py
 |------|------|
 | 노드 이름 | `motion_test` |
 | 입력 | 없음 — 코드에 정해 둔 시험 목록을 차례로 실행 |
-| 출력 | gpiozero `Motor` 2개 — 6.3과 같은 핀 |
+| 출력 | `Wheels` 2개(왼쪽·오른쪽 — 모터 4개) — 6.1의 핀 |
 | 파라미터 | `speed` 시험 속도(0.5) · `step_sec` 동작 하나의 시간(2.0초) |
+| 방향 값 | `LEFT_FWD`·`RIGHT_FWD` — 6.3에서 확정한 값 |
 | 종료 | 목록을 모두 실행하면 정지 후 종료 · `Ctrl+C`에도 정지 |
 
 `~/ros2_ws/src/my_car_pkg/my_car_pkg/motion_test.py`:
@@ -792,15 +837,33 @@ python3 motor_test.py
 ```python
 import rclpy
 from rclpy.node import Node
-from gpiozero import Motor
+from gpiozero import DigitalOutputDevice, PWMOutputDevice
+
+LEFT_FWD, RIGHT_FWD = 1, 0                                        # 6.3에서 확정한 방향 값
+
+class Wheels:
+    """한쪽 바퀴 2개 — 방향(DIR) 핀 + 속도(PWM) 핀"""
+    def __init__(self, dir_pins, pwm_pins):
+        self.dirs = [DigitalOutputDevice(p) for p in dir_pins]   # 방향: 0 또는 1
+        self.pwms = [PWMOutputDevice(p) for p in pwm_pins]       # 속도: 0.0~1.0
+
+    def set(self, level, speed):                                  # 두 모터에 같은 값
+        for d in self.dirs:
+            d.value = level
+        for p in self.pwms:
+            p.value = speed
+
+    def stop(self):
+        for p in self.pwms:
+            p.value = 0.0
 
 class MotionTest(Node):
     def __init__(self):
         super().__init__('motion_test')
         self.declare_parameter('speed', 0.5)                      # ① 시험 속도(0~1)
         self.declare_parameter('step_sec', 2.0)                   # ② 동작 하나의 시간(초)
-        self.left  = Motor(forward=17, backward=27, enable=12)    # ③ 6.3과 같은 핀
-        self.right = Motor(forward=5,  backward=6,  enable=13)
+        self.left  = Wheels(dir_pins=[18, 22], pwm_pins=[19, 23]) # ③ 모터 1·3 (왼쪽)
+        self.right = Wheels(dir_pins=[20, 24], pwm_pins=[21, 25]) #    모터 2·4 (오른쪽)
 
         self.steps = [('forward', self.forward), ('stop', self.stop),       # ④ 시험 목록
                       ('backward', self.backward), ('stop', self.stop),
@@ -814,19 +877,19 @@ class MotionTest(Node):
 
     def forward(self):                                            # ⑥ 동작 하나에 함수 하나
         s = self.get_parameter('speed').value
-        self.left.forward(s);  self.right.forward(s)
+        self.left.set(LEFT_FWD, s);      self.right.set(RIGHT_FWD, s)
 
-    def backward(self):
+    def backward(self):                                           # 방향 값 반전 = 뒤로
         s = self.get_parameter('speed').value
-        self.left.backward(s); self.right.backward(s)
+        self.left.set(1 - LEFT_FWD, s);  self.right.set(1 - RIGHT_FWD, s)
 
     def turn_left(self):                                          # 제자리 좌회전
         s = self.get_parameter('speed').value
-        self.left.backward(s); self.right.forward(s)
+        self.left.set(1 - LEFT_FWD, s);  self.right.set(RIGHT_FWD, s)
 
     def turn_right(self):                                         # 제자리 우회전
         s = self.get_parameter('speed').value
-        self.left.forward(s);  self.right.backward(s)
+        self.left.set(LEFT_FWD, s);      self.right.set(1 - RIGHT_FWD, s)
 
     def stop(self):
         self.left.stop(); self.right.stop()
@@ -855,10 +918,10 @@ def main(args=None):
         rclpy.shutdown()
 ```
 
-| # | 하는 일 |
+| # | 기능 |
 |:--:|------|
 | ①② | 속도·시간을 **파라미터로** — 실행할 때 바꾸어 시험(Day 3 자료 5장) |
-| ③ | 6.3 단품에서 확인한 핀을 그대로 사용 |
+| ③ | 6.3 단품에서 확인한 핀을 그대로 사용 — `Wheels` 하나가 한쪽 모터 2개를 함께 구동 |
 | ④ | **(이름, 함수)** 쌍을 순서대로 담은 시험 목록 — 동작 사이에 정지를 두어 하나씩 확인 |
 | ⑤ | 타이머가 `step_sec`마다 `next_step`을 호출 — 첫 동작은 실행 2초 뒤 시작 |
 | ⑥ | **동작 함수** — 좌우 바퀴의 조합을 이름 하나로 묶음(6.4 첫머리의 함수 표) |
@@ -867,12 +930,24 @@ def main(args=None):
 | ⑩ | `done`이 참이 될 때까지 콜백을 하나씩 처리 — 끝나면 반복을 빠져나와 종료 |
 | ⑪ | **종료 시 정지 보장** — 중간에 `Ctrl+C`를 눌러도 바퀴가 멈춤 |
 
-**코드 읽기 — Python 문법 ④ 함수를 목록에 담기**
+**코드 읽기 — Python 문법 ④ 클래스와 함수 목록** — `Wheels` 클래스
+
+| 코드 | 뜻 |
+|------|------|
+| `class Wheels:` | 클래스 정의 — 핀 묶음과 동작(`set`·`stop`)을 한 단위로(4.3 ①) |
+| `[DigitalOutputDevice(p) for p in dir_pins]` | **리스트 컴프리헨션** — 핀마다 출력 객체를 만들어 담음(Day 5 자료 10.3 ⑤) |
+| `for d in self.dirs:` + 들여 쓴 줄 | 항목을 하나씩 `d`로 받아 반복 — 모터 2개에 같은 값 |
+| `d.value = level` | 출력 객체의 값에 대입 — 방향 0·1 / 속도 0.0~1.0 |
+| `1 - LEFT_FWD` | 방향 값 반전 — 1이면 0, 0이면 1 |
+
+- `Wheels`는 `Node`를 상속하지 않는 일반 클래스입니다 — ROS2와 무관한 GPIO 묶음이므로 7.2에서도 그대로 사용합니다
+
+**코드 읽기 — Python 문법 ④ 클래스와 함수 목록 (계속)** — 동작 함수와 목록
 
 | 코드 | 뜻 |
 |------|------|
 | `def forward(self):` | 메서드 정의 — 동작 하나를 이름 하나로 묶음(4.3 ①의 `class`·`self.` 형태) |
-| `self.left.forward(s);  self.right.forward(s)` | 세미콜론 = 한 줄에 두 문장 — 좌우 한 쌍의 짧은 동작에만 사용 |
+| `self.left.set(…);  self.right.set(…)` | 세미콜론 = 한 줄에 두 문장 — 좌우 한 쌍의 짧은 동작에만 사용 |
 | `('forward', self.forward)` | **튜플** — 값 두 개를 소괄호로 묶은 쌍(Day 5 자료 5.3·10.3의 형태) |
 | `self.forward` (괄호 없음) | **함수 자체**를 값으로 다룸 — 호출하지 않고 목록에 보관 |
 | `[ …, … ]` | **리스트** — 여러 값을 순서대로 담는 목록(Day 5 자료 5.3의 형태) |
@@ -887,10 +962,10 @@ def main(args=None):
 | `len(self.steps)` | 목록의 길이(항목 수) — 여기서는 8 |
 | `self.index += 1` | 1 증가 — `self.index = self.index + 1`과 같음 |
 | `f'step {self.index + 1}: {name}'` | f-문자열 — 중괄호 안의 식을 계산해 문자열 안에 표시(4.3 ②) |
-| `while rclpy.ok() and not node.done:` | 두 조건이 모두 참인 동안 반복 — `not`은 참·거짓을 뒤집음 |
+| `while rclpy.ok() and not node.done:` | 두 조건이 모두 참인 동안 반복 — `not`은 참·거짓을 반전함 |
 | `rclpy.spin_once(node)` | 콜백을 한 번만 처리하고 반환(Day 2 자료 6.4) — 반복을 끝낼 조건을 직접 정할 수 있음 |
 
-- 표 ④·⑤의 형태는 **7.2와 이후 Day의 노드에도 다시 싣습니다** — 코드를 읽을 때마다 표를 참조합니다
+- 표 ④·⑤의 형태를 **7.2와 이후 Day의 노드에도 다시 싣습니다** — 코드를 읽을 때마다 표를 참조합니다
 
 **실행** — 바퀴를 공중에 띄운 상태에서 실행합니다.
 
@@ -908,6 +983,7 @@ ros2 run my_car_pkg motion_test
 - 로그의 `step 1: forward` … `step 8: stop`에 맞추어 바퀴가 6.3의 표대로 회전하면 → 정상 · 관찰로 진행
 - `executable 'motion_test' not found`가 나오면 → `setup.py` 등록을 확인하고 **빌드부터 다시** 실행
 - 로그는 출력되지만 바퀴가 회전하지 않으면 → **6.3 단품 스크립트를 다시** 실행해 배선을 확인 → 단품이 정상이면 ③의 핀 번호를 6.3과 대조하고 **빌드부터 다시** 실행
+- 한쪽 바퀴가 6.3과 반대로 회전하면 → 파일 첫머리의 `LEFT_FWD`·`RIGHT_FWD`를 6.3에서 확정한 값과 대조하고 **빌드부터 다시** 실행
 - 좌회전과 우회전이 서로 바뀌면 → ⑥의 `turn_left`·`turn_right` 조합을 6.4 첫머리의 함수 표와 대조하고 **빌드부터 다시** 실행
 - 멈추지 않고 계속 회전하면 → `Ctrl+C`(⑪이 정지를 보장) → 그래도 회전하면 **배터리를 분리**하고 교수에게 알림
 
@@ -930,13 +1006,13 @@ ros2 param list /motion_test    # speed · step_sec 표시
 | 2 | 시험 목록을 **전진 → 좌회전 → 전진**으로 바꾸어 실행 | 목록만 고치면 동작 순서가 바뀜 |
 | 3 | 바닥에 내려놓고 저속으로 실행 | 네 동작의 **실제 차체 움직임** — 넓은 공간에서 |
 
-- 3에서 `step_sec`을 바꾸면 회전 각도가 달라집니다 — 시간으로 정한 각도는 배터리 상태·바닥 마찰에 따라 달라지므로, 정확한 각도 제어에는 바퀴 회전량을 측정하는 센서(엔코더)가 필요합니다(Day 7에서 비교)
+- 3에서 `step_sec`을 바꾸면 회전 각도가 달라집니다 — 시간으로 정한 각도는 배터리 상태·바닥 마찰에 좌우됩니다. 정확한 각도 제어에는 바퀴 회전량을 측정하는 센서(엔코더)가 필요합니다(Day 7에서 비교)
 
 ---
 
 ## 7. 실습 ④ — 모터 제어 노드
 
-### 7.1 설계 — Twist를 두 바퀴로
+### 7.1 설계 — Twist를 두 바퀴 속도로 변환
 
 6.4에서는 동작마다 함수를 하나씩 두었습니다. `Twist`는 **전진량(`linear.x`)과 회전량(`angular.z`) 두 값**으로 네 동작을 모두 표현합니다.
 
@@ -950,14 +1026,14 @@ ros2 param list /motion_test    # speed · step_sec 표시
 
 - 함수 넷을 **공식 하나**로 바꾸면 어떤 명령을 받아도 좌우 바퀴의 속도가 정해집니다 — 전진하며 조금씩 회전하는 중간 동작도 표현됩니다(7.1 변환 공식)
 
-바퀴 2개로 방향을 바꾸는 방식을 **차동 구동**(differential drive — 좌우 바퀴의 속도 차로 회전)이라고 합니다.
+바퀴 2개로 방향을 바꾸는 방식을 **차동 구동**(differential drive)이라고 합니다 — 좌우 바퀴의 속도 차로 회전합니다.
 
 | 항목 | 내용 |
 |------|------|
 | 노드 이름 | `motor_node` |
 | 구독 | `/cmd_vel` (`geometry_msgs/msg/Twist`) — turtlesim과 **같은 메시지 타입** |
-| 출력 | gpiozero `Motor` 2개 (토픽이 아니라 **GPIO 구동**) |
-| 파라미터 | `max_linear`(정규화 기준)·`turn_gain`(회전 민감도)·`trim`(직진 보정 7.4) |
+| 출력 | `Wheels` 2개 = 모터 4개(6.4 · 토픽이 아니라 **GPIO 구동**) |
+| 파라미터 | `max_linear`·`turn_gain`·`trim`(7.4) · `left_forward`·`right_forward`(방향 값 6.3) |
 | 안전 | `/cmd_vel`이 **0.5초 이상 끊기면 정지** |
 
 **변환 공식**:
@@ -979,7 +1055,23 @@ right = linear.x + angular.z × turn_gain
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
-from gpiozero import Motor
+from gpiozero import DigitalOutputDevice, PWMOutputDevice
+
+class Wheels:
+    """한쪽 바퀴 2개 — 방향(DIR) 핀 + 속도(PWM) 핀 (6.4와 같은 클래스)"""
+    def __init__(self, dir_pins, pwm_pins):
+        self.dirs = [DigitalOutputDevice(p) for p in dir_pins]   # 방향: 0 또는 1
+        self.pwms = [PWMOutputDevice(p) for p in pwm_pins]       # 속도: 0.0~1.0
+
+    def set(self, level, speed):
+        for d in self.dirs:
+            d.value = level
+        for p in self.pwms:
+            p.value = speed
+
+    def stop(self):
+        for p in self.pwms:
+            p.value = 0.0
 
 class MotorNode(Node):
     def __init__(self):
@@ -987,9 +1079,11 @@ class MotorNode(Node):
         self.declare_parameter('max_linear', 2.0)                 # ① 정규화 기준
         self.declare_parameter('turn_gain', 0.6)
         self.declare_parameter('trim', 0.0)                       # 7.4 직진 보정
+        self.declare_parameter('left_forward', 1)                 # ① 앞으로 도는 방향 값
+        self.declare_parameter('right_forward', 0)                #    6.3에서 확정한 값
 
-        self.left  = Motor(forward=17, backward=27, enable=12)    # ② 6.3과 같은 핀
-        self.right = Motor(forward=5,  backward=6,  enable=13)
+        self.left  = Wheels(dir_pins=[18, 22], pwm_pins=[19, 23]) # ② 모터 1·3 (왼쪽)
+        self.right = Wheels(dir_pins=[20, 24], pwm_pins=[21, 25]) #    모터 2·4 (오른쪽)
 
         self.cmd = Twist()                                        # ③ 최신 명령 보관
         self.last_received = self.get_clock().now()
@@ -1010,20 +1104,22 @@ class MotorNode(Node):
         gain = self.get_parameter('turn_gain').value
         trim = self.get_parameter('trim').value
         max_lin = self.get_parameter('max_linear').value
+        lf = self.get_parameter('left_forward').value
+        rf = self.get_parameter('right_forward').value
 
         l = (self.cmd.linear.x - self.cmd.angular.z * gain) / max_lin + trim   # ⑥ 변환
         r = (self.cmd.linear.x + self.cmd.angular.z * gain) / max_lin - trim
-        self.set_wheel(self.left, l)
-        self.set_wheel(self.right, r)
+        self.set_wheel(self.left, l, lf)
+        self.set_wheel(self.right, r, rf)
 
-    def set_wheel(self, motor, v):
+    def set_wheel(self, wheels, v, fwd):
         v = max(-1.0, min(1.0, v))                                # ⑦ 범위 제한
         if v > 0.05:
-            motor.forward(v)
+            wheels.set(fwd, v)                                    # 앞으로
         elif v < -0.05:
-            motor.backward(-v)
+            wheels.set(1 - fwd, -v)                               # 뒤로 = 방향 값 반전
         else:
-            motor.stop()                                          # 미세 값은 정지 처리
+            wheels.stop()                                         # 미세 값은 정지 처리
 
 def main(args=None):
     rclpy.init(args=args)
@@ -1038,12 +1134,12 @@ def main(args=None):
         rclpy.shutdown()
 ```
 
-| # | 하는 일 |
+| # | 기능 |
 |:--:|------|
-| ① | 정규화 기준·회전 민감도·보정을 **파라미터로** — 차량마다 값이 다름 |
-| ② | 6.3 단품에서 검증된 핀·방향을 그대로 사용 |
+| ① | 정규화 기준·회전 민감도·보정·**방향 값**을 **파라미터로** — 차량마다 값이 다름 |
+| ② | 6.3 단품에서 검증된 핀을 그대로 사용 — `Wheels` 하나가 한쪽 모터 2개를 구동(6.4) |
 | ③ | 구독 콜백은 **보관만** — 구동 계산은 ④의 타이머가 담당 |
-| ④ | 20Hz 구동 갱신 — 명령 수신과 구동 주기의 분리 |
+| ④ | 구동 갱신 주기는 20Hz — 명령 수신 주기와 구동 주기의 분리 |
 | ⑤ | **신호 두절 시 정지** — 0.5초 넘게 새 명령이 없으면 정지. 명령이 끊겨도 차량이 계속 달리지 않게 하는 **안전 감시**(watchdog) |
 | ⑥ | 차동 구동 변환(7.1) + 직진 보정(`trim` — 7.4) |
 | ⑦ | −1.0~1.0 범위 제한 + **미세 값 정지 처리** — 낮은 듀티에서 모터가 소리만 내는 구간 회피(10.3) |
@@ -1053,10 +1149,12 @@ def main(args=None):
 
 | 코드 | 뜻 |
 |------|------|
-| `def set_wheel(self, motor, v):` | **메서드로 분리** — 같은 처리를 좌·우에 두 번 사용하기 위함. `self` 뒤가 실제 인자 |
-| `max(-1.0, min(1.0, v))` | **클램프**(범위 제한) — 안쪽 `min`으로 위를 자르고 바깥 `max`로 아래를 자름 |
+| `class Wheels:` · `for d in self.dirs:` | 6.4 코드 읽기 ④와 같은 클래스·반복 — 한쪽 모터 2개에 같은 값을 설정 |
+| `def set_wheel(self, wheels, v, fwd):` | **메서드로 분리** — 같은 처리를 좌·우에 두 번 사용. `self` 뒤가 인자(바퀴·속도·방향 값) |
+| `max(-1.0, min(1.0, v))` | **클램프**(범위 제한) — 안쪽 `min`으로 상한을, 바깥 `max`로 하한을 제한 |
 | `if v > 0.05:` `elif v < -0.05:` `else:` | 세 갈래 분기 — 양수·음수·그 사이(미세 값) |
-| `motor.forward(v)` | 객체의 메서드 호출 — 인자로 속도(0~1)를 전달 |
+| `wheels.set(fwd, v)` | 객체의 메서드 호출 — 인자로 방향 값과 속도(0~1)를 전달 |
+| `wheels.set(1 - fwd, -v)` | 뒤로 = 방향 값 반전(`1 - fwd`) + 양수로 바꾼 속도(`-v`) |
 | `node.left.stop(); node.right.stop()` | 세미콜론 = 한 줄에 두 문장 — 좌우 한 쌍의 짧은 동작에만 사용 |
 
 **코드 읽기 — Python 문법 ⑦ 시간 비교와 산술식** — 4.5 ③의 중첩 필드 형태가 다시 나타납니다.
@@ -1070,7 +1168,7 @@ def main(args=None):
 | `self.cmd.linear.x` | 점을 이어 **중첩 필드**를 읽음(`Twist` 안의 `linear` 안의 `x`) |
 | `self.cmd = msg` | 메시지 객체 자체를 보관 — 콜백은 보관만 하고 계산은 타이머가 담당 |
 
-- 표 ⑥·⑦의 항목은 **Day 8·9의 판단·회피 노드에도 같은 형태로 다시 나타납니다**
+- 표 ⑥·⑦의 항목을 **Day 8·9의 판단·회피 노드에도 같은 형태로 다시 싣습니다**
 
 `setup.py` 등록 후 빌드:
 
@@ -1081,11 +1179,11 @@ def main(args=None):
 > **자주 하는 실수**
 >
 > - 구독 콜백(`on_cmd`)에서 모터를 직접 구동하면 명령이 끊겼을 때 호출 자체가 멈추므로 **신호 두절 정지(⑤)가 동작하지 않습니다** — 콜백은 보관만, 구동은 타이머가 담당합니다(③④)
-> - `max_linear`를 명령 속도보다 작게 설정하면 계산값이 1.0을 넘습니다. 그러면 **범위 제한(⑦)으로 1.0에 고정되어 바퀴가 항상 최고 속도**로 회전합니다 — teleop의 속도(2.0)에 맞춘 기본값을 유지합니다
+> - `max_linear`를 명령 속도보다 작게 설정하면 계산값이 1.0을 넘습니다. 그러면 **범위 제한(⑦)으로 값이 1.0에 고정되어 모터가 항상 최고 속도**로 회전합니다 — teleop의 속도(2.0)에 맞춘 기본값을 유지합니다
 
-### 7.3 단독 확인 — 수동 명령 발행
+### 7.3 단독 확인 — 명령 직접 발행
 
-Day 1 자료 7장에서 turtlesim을 움직인 방식 그대로 — 명령을 보내는 노드 없이 `topic pub`으로 확인합니다. **바퀴는 바닥에서 띄워 둡니다**.
+Day 1 자료 7장에서 turtlesim에 명령을 보낸 방식 그대로 — 명령을 보내는 노드 없이 `topic pub`으로 확인합니다. **바퀴를 공중에 띄운 상태로 확인합니다**.
 
 ```bash
 # 터미널 1
@@ -1106,15 +1204,16 @@ ros2 topic pub --once   /cmd_vel geometry_msgs/msg/Twist "{}"                   
 | 2 | `linear.x` 음수 | 두 바퀴 뒤로 — `backward()`와 같음 |
 | 3 | `angular.z` 양수 | 왼쪽 뒤로·오른쪽 앞으로 — `turn_left()`와 같음(7.1 부호) |
 | 4 | `angular.z` 음수 | 왼쪽 앞으로·오른쪽 뒤로 — `turn_right()`와 같음 |
-| 5 | 빈 명령 `{}` · 발행 중단 | **정지** — `--rate` 발행을 `Ctrl+C`로 멈추어도 0.5초 뒤 신호 두절 정지(코드 ⑤) |
+| 5 | 빈 명령 `{}` · 발행 중단 | **정지** — `--rate` 발행을 `Ctrl+C`로 멈추어도 0.5초 뒤 자동 정지(코드 ⑤) |
 
 - 다섯 항목이 표대로 동작하면 → 7.4로 진행
 - 3·4에서 소리만 나고 바퀴가 회전하지 않으면 → 듀티가 낮은 상태입니다(10.3). `angular.z`를 3.0으로 올려 **다시** 확인
 - 바퀴가 전혀 회전하지 않으면 → `ros2 topic hz /cmd_vel`로 명령이 도착하는지 먼저 확인 → 명령은 도착하지만 회전하지 않으면 **6.3 단품 확인으로 돌아가** 배선을 검증
-- 회전 방향이 표와 반대이면 → **6.3의 단품 방향**을 다시 확인(코드가 아니라 배선 문제일 때가 많습니다) → 단품이 정상이면 7.1의 부호를 확인하고 **빌드부터 다시** 실행
+- 한쪽 바퀴 2개가 함께 표와 반대로 회전하면 → `left_forward`·`right_forward`가 6.3에서 확정한 값과 다른 상태입니다. `ros2 param set /motor_node left_forward 0`(또는 `right_forward`)으로 바꾼 뒤 **1부터 다시** 확인
+- 그 밖에 회전 방향이 표와 반대이면 → **6.3의 단품 방향**을 다시 확인(코드가 아니라 배선 문제일 때가 많습니다) → 단품이 정상이면 7.1의 부호를 확인하고 **빌드부터 다시** 실행
 - 발행을 멈추어도 계속 회전하는 경우 → ⑤ 신호 두절 정지가 코드에 있는지 확인하고 **빌드부터 다시** 실행. 그 사이 **전원을 분리**해 정지시킵니다
 - `executable 'motor_node' not found`가 나오면 → `setup.py` 등록을 확인하고 **빌드부터 다시** 실행
-- `--rate 5`를 사용하는 이유 — `--once`로 한 번만 발행하면 새 명령이 없어 0.5초 뒤 신호 두절 정지가 동작함. **⑤가 정상 동작한다는 증거**이기도 함
+- `--rate 5`를 사용하는 이유 — `--once` 한 번이면 0.5초 뒤 안전 정지가 동작함. **⑤가 정상 동작한다는 증거**이기도 함
 
 ### 7.4 직진 보정 — trim
 
@@ -1231,7 +1330,7 @@ ros2 run turtlesim turtle_teleop_key --ros-args -r /turtle1/cmd_vel:=/cmd_vel
 | 항목 | 내용 |
 |------|------|
 | PWM | 켬 비율(듀티 사이클)로 평균 전력 조절 — gpiozero는 0.0~1.0 값으로 지정 |
-| L298N | H-브리지 — IN 조합 = 방향 · EN = 속도(점퍼 제거 후 PWM). **모터 전원은 전용 배터리·GND는 공통** |
+| 모터 드라이버 | H-브리지 = 전류 방향 전환. **DRV8835**(제어보드) — 모터마다 방향 핀(0·1) + 속도 핀(PWM) · 모터 4개 = GPIO 8개. **모터 전류는 배터리에서 · GND는 공통** |
 | 동작 함수 | `forward`·`backward`·`turn_left`·`turn_right`·`stop` — (이름, 함수) 목록으로 차례 시험 |
 | 모터 노드 | 네 함수를 공식 하나로(`left = lin − ang·gain` / `right = lin + ang·gain`) · **신호 두절 0.5초 정지** |
 | 직진 보정 | 모터 개체 차는 `trim` 파라미터로 — 값은 차량 고유·`param dump`로 보관 |
@@ -1312,8 +1411,8 @@ ros2 interface show sensor_msgs/msg/Range
 
 | 증상 | 원인 | 대책 |
 |------|------|------|
-| 모터 기동 순간 RPi5 재부팅 | 모터 전류로 인한 전압 강하 — 전원 미분리 | 5.4 전원 분리 재확인 |
-| 주행 중 간헐 재부팅 | RPi5 어댑터 용량 부족 | 5V/5A 어댑터 사용(Day 3 자료 11.1) |
+| 모터 기동 순간 RPi5 재부팅 | 모터 전류로 인한 전압 강하 | 5.4 전원 경로를 교재 10.2와 대조 · 배터리 충전 상태 확인 |
+| 주행 중 간헐 재부팅 | RPi5 공급 전원의 용량 부족 | 5V/5A 공급 확인(Day 3 자료 11.1) · 배터리 충전 상태 확인 |
 | 속도가 점점 느려짐 | **배터리 방전** — 전압 하락 | 배터리 교체·충전. `trim` 값도 달라질 수 있음 |
 | 특정 동작에서만 정지 | 급가속·급반전 시 순간 전류 최대 | 명령 변화를 완만하게(가감속 완화 — Day 9 소재) |
 
