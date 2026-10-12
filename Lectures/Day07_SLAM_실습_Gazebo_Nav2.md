@@ -1979,7 +1979,8 @@ python3 ~/ros2_scripts/random_avoid.py
 | 장애물 | 정면 약 0.35 m에서 정지 → 제자리 회전 → 터미널에 「회전 완료 …°」 | 벽에 닿음 → `STOP_DISTANCE`를 늘린 뒤(예: 0.45) **13.3을 다시** |
 | 종료 | Ctrl+C → 로봇 정지 | 계속 움직임 → `ros2 topic pub --once /cmd_vel geometry_msgs/msg/TwistStamped "{}"` |
 
-- 이 강의 실습 실측(2026-10-12) — 장애물 판단 14회(0.32\~0.35 m) · 회전 완료 13회(180\~184°) · 접촉 0회 · 주행 약 12 m · Ctrl+C 뒤 마지막 명령 = 속도 0
+- 이 강의 실습 실측(2026-10-12 · burger · 약 59 m 주행) — 장애물 판단과 180° 회전 60회(판단 거리 0.24\~0.35 m · 회전 180\~184°) · 전 방향 최소 거리 0.12 m · 0.13 m 미만 근접 7회 · Ctrl+C 뒤 마지막 명령 = 속도 0
+- 도전 — 정면 ±30° 밖의 좌우 구간도 감시해, 장애물이 가까우면 반대쪽으로 방향을 바꾸도록 고칩니다(아래 정리의 근접 관측)
 
 <details>
 <summary>실습 정리</summary>
@@ -1988,9 +1989,39 @@ python3 ~/ros2_scripts/random_avoid.py
 
 - 회전 각도를 누적할 때 `normalize`를 사용하는 이유 — 방향(yaw)은 −180°\~180° 범위이므로 경계를 넘을 때 값이 360° 가까이 뛰므로, 두 값의 차이를 −π\~π 범위로 맞춘 뒤 더합니다
 
-- 회전 중에는 정면이 아닌 방향의 벽에 가까워질 수 있습니다 — 실측 최소 0.19 m · 접촉 없음
+- 판단 구간은 정면 ±30°뿐입니다 — 그 밖의 방향에서 가까워지는 장애물은 판단하지 않습니다. 약 59 m 주행에서 0.13 m 미만 근접이 7회 관측되었고, 판단 시점의 정면 거리가 0.24 m까지 줄어든 경우도 있었습니다
 
 </details>
+
+### 13.4 카메라 모델(`burger_cam`)로 실행
+
+| 모델(`TURTLEBOT3_MODEL`) | 센서 |
+|------|------|
+| `burger`(지금까지 사용) | IMU · LiDAR — 카메라 없음 |
+| `burger_cam` | IMU · LiDAR · 광각 카메라(`/camera/image_raw` · 320 × 240) |
+
+| 순서 | 조작 | 확인 | 아니면 |
+|:--:|------|------|------|
+| ① | 터미널 1에서 Ctrl+C로 world 종료 → `pgrep -af "gz sim"` | 출력 없음 | `pkill -f "gz sim"` → **①을 다시** |
+| ② | 같은 터미널에서 `export TURTLEBOT3_MODEL=burger_cam` → 5.1 launch | 카메라가 달린 로봇 표시 | 5.1 확인 표 |
+| ③ | 새 터미널에서 `ros2 run rqt_image_view rqt_image_view` → `/camera/image_raw` 선택 | 로봇 앞의 기둥·벽 영상 | 목록에 없음 → ②의 `export` 확인 → **②를 다시** |
+| ④ | `python3 ~/ros2_scripts/random_avoid.py` | 랜덤 주행 · 장애물 앞 180° 회전 | 13.3 확인 표 |
+
+```bash
+# ① 종료 확인 — 출력이 없으면 정상
+pgrep -af "gz sim"
+# ② 모델 변경 후 기동 (터미널 1)
+export TURTLEBOT3_MODEL=burger_cam
+ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
+# ③ 카메라 영상 (새 터미널)
+ros2 run rqt_image_view rqt_image_view
+```
+
+- ①에서 Gazebo 창을 닫아 종료하지 않습니다 — 창을 닫으면 launch는 끝나도 Gazebo 서버가 남는 경우가 있습니다(이 강의 실습 기록)
+- `export`는 그 터미널에서만 적용됩니다 — `.bashrc`에는 `burger`가 등록되어 있으므로, 다른 터미널에서 Nav2 등을 기동하면 그 터미널에도 같은 `export`를 실행합니다
+- Gazebo 안의 로봇 이름이 `burger_cam`이 됩니다 — 5.1 「로봇이 넘어졌을 때」 ② 명령의 `name: "burger"`를 `name: "burger_cam"`으로 바꿉니다
+- `random_avoid.py`는 코드 수정 없이 동작합니다 — 토픽 이름과 타입(`/scan` · `/odom` · `/cmd_vel` = `TwistStamped`)이 같습니다
+- 이 강의 실습 PC(소프트웨어 렌더링) 실측 — 영상 초당 약 1.8회 · `/scan` 초당 약 0.3회(burger 약 3회) · 시뮬레이션 실시간 비율 약 0.06 · 랜덤 주행 회전 2회 모두 181°. burger보다 크게 느려졌습니다
 
 ---
 
