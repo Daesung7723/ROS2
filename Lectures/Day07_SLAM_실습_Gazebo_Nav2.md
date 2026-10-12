@@ -20,7 +20,8 @@
 10. [미니프로젝트 — 직접 작성한 지도에서 두 지점 왕복](#10-미니프로젝트--직접-작성한-지도에서-두-지점-왕복)
 11. [정리 — SLAM의 요구 조건과 실습 차량](#11-정리--slam의-요구-조건과-실습-차량)
 12. [보충](#12-보충)
-13. [다음 시간](#13-다음-시간)
+13. [실습 과제 — LiDAR 랜덤 주행과 장애물 회피](#13-실습-과제--lidar-랜덤-주행과-장애물-회피)
+14. [다음 시간](#14-다음-시간)
 
 ---
 
@@ -1008,7 +1009,7 @@ free_thresh: 0.196
 graph LR
     M[지도 · 위치] --> P[플래너<br>전역 경로]
     P --> C[컨트롤러<br>속도 명령]
-    C --> V[/cmd_vel]
+    C --> V[ /cmd_vel]
     K[코스트맵] --> P
     K --> C
     style C fill:#4a7ba6,color:#fff
@@ -1820,7 +1821,180 @@ self.pub.publish(msg)
 
 ---
 
-## 13. 다음 시간
+## 13. 실습 과제 — LiDAR 랜덤 주행과 장애물 회피
+
+**학습목표**
+- `/scan`으로 정면 장애물을 판단하고 `/cmd_vel`로 주행 명령을 발행하는 노드를 작성할 수 있다.
+- `/odom`의 방향 변화로 회전 각도를 판정할 수 있다.
+
+### 13.1 과제 — turtlesim 랜덤 주행을 TurtleBot3로
+
+- Day 6 과제(turtlesim 랜덤 주행 방식을 실습 차량으로 구현)와 같은 동작을 Gazebo의 TurtleBot3에서 LiDAR로 구현합니다 — 랜덤으로 주행하다가 장애물을 만나면 180° 회전한 뒤 계속 주행합니다
+
+| 항목 | 조건 |
+|------|------|
+| 구독 | `/scan` — 정면 ±30° 구간의 최소 거리 · `inf`와 `range_min` 미만 제외 |
+| 발행 | `/cmd_vel` — `TwistStamped`(5.5) |
+| 랜덤 주행 | 직진 0.15 m/s · 1\~3초마다 각속도를 −0.8\~0.8 rad/s에서 무작위로 선택 |
+| 장애물 판단 | 정면 최소 거리 0.35 m 미만 → 정지 → 제자리 180° 회전 → 랜덤 주행 복귀 |
+| 180° 판정 | `/odom`의 방향 변화를 누적 |
+| 종료 | Ctrl+C → 정지 명령 1회 발행 |
+
+- 실행 전에 Nav2와 teleop을 종료합니다 — 다른 노드가 `/cmd_vel`을 함께 발행하면 명령이 섞입니다(7.3 ④)
+
+### 13.2 코드 — `random_avoid.py`
+
+`~/ros2_scripts/random_avoid.py`로 저장합니다(9.1과 같은 방식 — 패키지 미등록 · `python3`으로 실행).
+
+```python
+#!/usr/bin/env python3
+# random_avoid.py — LiDAR로 장애물을 판단하며 랜덤 주행하는 노드 (TurtleBot3 · Gazebo)
+import math
+import random
+
+import rclpy
+from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
+from rclpy.signals import SignalHandlerOptions
+from geometry_msgs.msg import TwistStamped
+from nav_msgs.msg import Odometry
+from sensor_msgs.msg import LaserScan
+
+FORWARD_SPEED = 0.15            # ① 직진 속도 (m/s)
+TURN_SPEED = 1.0                #    180° 회전의 각속도 (rad/s)
+STOP_DISTANCE = 0.35            #    정면 거리가 이보다 가까우면 장애물로 판단 (m)
+FRONT_ANGLE = math.radians(30)  #    정면 구간 = 좌우 30°
+RANDOM_TURN = 0.8               #    랜덤 각속도의 최대 크기 (rad/s)
+
+
+def normalize(angle):
+    """각도를 -π ~ π 범위로 맞춤"""
+    return math.atan2(math.sin(angle), math.cos(angle))
+
+
+class RandomAvoid(Node):
+    def __init__(self):
+        super().__init__('random_avoid')
+        self.pub = self.create_publisher(TwistStamped, '/cmd_vel', 10)       # ② TwistStamped
+        self.create_subscription(LaserScan, '/scan', self.on_scan,
+                                 qos_profile_sensor_data)                     # ③ 센서 데이터 QoS
+        self.create_subscription(Odometry, '/odom', self.on_odom, 10)
+        self.front = None          # 정면 구간의 최소 거리 (m)
+        self.yaw = None            # 현재 방향 (rad)
+        self.state = 'FORWARD'     # FORWARD = 랜덤 주행 · TURN = 180° 회전
+        self.angular = 0.0         # 랜덤 주행의 각속도 (rad/s)
+        self.next_change = None    # 각속도를 다시 정할 시각 (s)
+        self.turned = 0.0          # 회전한 누적 각도 (rad)
+        self.last_yaw = None
+        self.turn_dir = 1.0        # 회전 방향 (1 = 왼쪽 · -1 = 오른쪽)
+        self.create_timer(0.1, self.loop)   # 0.1초마다 판단
+
+    def on_scan(self, msg):                                                   # ④ 정면 최소 거리
+        values = []
+        for i, r in enumerate(msg.ranges):
+            angle = normalize(msg.angle_min + i * msg.angle_increment)
+            if abs(angle) <= FRONT_ANGLE and msg.range_min <= r <= msg.range_max:
+                values.append(r)
+        self.front = min(values) if values else math.inf   # 구간에 값이 없으면 장애물 없음
+
+    def on_odom(self, msg):                                                   # ⑤ 쿼터니언 → 방향
+        q = msg.pose.pose.orientation
+        self.yaw = math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z))
+
+    def send(self, linear, angular):
+        msg = TwistStamped()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.twist.linear.x = linear
+        msg.twist.angular.z = angular
+        self.pub.publish(msg)
+
+    def loop(self):                                                           # ⑥ 상태 판단
+        if self.front is None or self.yaw is None:
+            return                                   # 센서 값을 받기 전에는 대기
+        now = self.get_clock().now().nanoseconds / 1e9
+        if self.state == 'FORWARD':
+            if self.front < STOP_DISTANCE:
+                self.state = 'TURN'
+                self.turned = 0.0
+                self.last_yaw = self.yaw
+                self.turn_dir = random.choice([1.0, -1.0])
+                self.get_logger().info(f'장애물 {self.front:.2f} m → 180° 회전 시작')
+                self.send(0.0, 0.0)
+                return
+            if self.next_change is None or now >= self.next_change:          # ⑦ 랜덤 각속도
+                self.angular = random.uniform(-RANDOM_TURN, RANDOM_TURN)
+                self.next_change = now + random.uniform(1.0, 3.0)
+            self.send(FORWARD_SPEED, self.angular)
+        else:  # TURN — /odom의 방향 변화로 회전 각도를 누적                  # ⑧ 180° 판정
+            self.turned += abs(normalize(self.yaw - self.last_yaw))
+            self.last_yaw = self.yaw
+            if self.turned >= math.pi:
+                self.state = 'FORWARD'
+                self.next_change = None
+                self.get_logger().info(f'회전 완료 {math.degrees(self.turned):.0f}° → 랜덤 주행')
+                self.send(0.0, 0.0)
+            else:
+                self.send(0.0, TURN_SPEED * self.turn_dir)
+
+
+def main():
+    rclpy.init(signal_handler_options=SignalHandlerOptions.NO)   # ⑨ Ctrl+C 뒤에도 정지 명령 발행
+    node = RandomAvoid()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.send(0.0, 0.0)          # 종료 전 정지
+        node.destroy_node()
+        rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()
+```
+
+| # | 기능 |
+|:--:|------|
+| ① | 동작 수치 — 속도 · 판단 거리 · 정면 구간 · 랜덤 각속도 범위 |
+| ② | `/cmd_vel` = `TwistStamped` — `Twist`로 발행하면 오류 없이 움직이지 않음(5.5) |
+| ③ | `/scan`은 센서 데이터 QoS로 발행되므로 구독도 같은 설정(5.7) |
+| ④ | 정면 ±30° 안의 유효 거리 가운데 최솟값 · 값이 없으면 `inf`(장애물 없음) |
+| ⑤ | `/odom`의 쿼터니언 → 방향(yaw) |
+| ⑥ | 상태 2개 — FORWARD(랜덤 주행) ↔ TURN(180° 회전) · 0.1초마다 판단 |
+| ⑦ | turtlesim 랜덤 주행과 같은 방식 — 1\~3초마다 각속도를 무작위로 다시 정함 |
+| ⑧ | 회전 각도 = `/odom` 방향 변화의 누적 — 시간으로 측정하지 않음(아래 정리) |
+| ⑨ | `SignalHandlerOptions.NO` — Ctrl+C를 `KeyboardInterrupt`로 받아 `finally`에서 정지 명령 발행 |
+
+### 13.3 실행과 확인
+
+```bash
+# 터미널 5 — 시뮬레이터(터미널 1) 실행 중 · Nav2·teleop 종료 상태
+python3 ~/ros2_scripts/random_avoid.py
+```
+
+| 확인 | 정상 | 아니면 |
+|------|------|------|
+| 출발 | 직진하면서 방향을 조금씩 바꿈 | 움직이지 않음 → `ros2 topic info /cmd_vel`의 `Type:` 개수 확인(5.5) → **13.3을 다시** |
+| 장애물 | 정면 약 0.35 m에서 정지 → 제자리 회전 → 터미널에 「회전 완료 …°」 | 벽에 닿음 → `STOP_DISTANCE`를 늘린 뒤(예: 0.45) **13.3을 다시** |
+| 종료 | Ctrl+C → 로봇 정지 | 계속 움직임 → `ros2 topic pub --once /cmd_vel geometry_msgs/msg/TwistStamped "{}"` |
+
+- 이 강의 실습 실측(2026-10-12) — 장애물 판단 14회(0.32\~0.35 m) · 회전 완료 13회(180\~184°) · 접촉 0회 · 주행 약 12 m · Ctrl+C 뒤 마지막 명령 = 속도 0
+
+<details>
+<summary>실습 정리</summary>
+
+- 회전 각도를 시간으로 측정하지 않는 이유 — 시뮬레이션이 실제보다 느리게 진행되므로(5.1 실시간 비율) 실제 시간 기준으로 「1 rad/s × 3.14초」 동안 회전 명령을 보내면 시뮬레이션 안에서는 180°보다 작게 회전합니다. `/odom`의 방향 변화는 시뮬레이션 안의 회전량입니다
+
+- 회전 각도를 누적할 때 `normalize`를 사용하는 이유 — 방향(yaw)은 −180°\~180° 범위이므로 경계를 넘을 때 값이 360° 가까이 뛰므로, 두 값의 차이를 −π\~π 범위로 맞춘 뒤 더합니다
+
+- 회전 중에는 정면이 아닌 방향의 벽에 가까워질 수 있습니다 — 실측 최소 0.19 m · 접촉 없음
+
+</details>
+
+---
+
+## 14. 다음 시간
 
 **Day 8 — 인식·판단·행동 통합**(10/19)
 
