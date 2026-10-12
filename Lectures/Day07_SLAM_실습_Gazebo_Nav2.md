@@ -239,13 +239,14 @@ graph LR
 
 ```bash
 sudo apt update
-sudo apt install ros-jazzy-ros-gz \
+sudo apt install -y ros-jazzy-ros-gz \
   ros-jazzy-turtlebot3-gazebo ros-jazzy-turtlebot3-teleop \
   ros-jazzy-turtlebot3-navigation2 ros-jazzy-slam-toolbox \
   ros-jazzy-nav2-simple-commander mesa-utils
 ```
 
-- 실행 후 **이 터미널은 그대로 두고** 다른 터미널에서 2장을 진행합니다 — 다운로드 규모가 커서 대기가 발생합니다
+- `-y` = 설치 여부를 묻는 질문(`Do you want to continue? [Y/n]`)에 「예」로 답하는 옵션입니다 — 빠뜨리면 이 질문에서 멈추고 다운로드가 시작되지 않습니다
+- `sudo` 비밀번호를 입력한 뒤 다운로드 진행 줄(`Get:`)이 출력되기 시작하면 **이 터미널은 그대로 두고** 다른 터미널에서 2장을 진행합니다 — 다운로드 규모가 커서 대기가 발생합니다
 - 환경변수 등록 — 오늘 실행하는 **모든 launch에 필요**합니다:
 
 ```bash
@@ -257,7 +258,7 @@ echo $TURTLEBOT3_MODEL                       # burger 출력 확인
 > **자주 하는 실수**
 >
 > - **`TURTLEBOT3_MODEL`이 비어 있으면** launch가 모델 파일을 찾지 못해 실패합니다. 새 터미널마다 적용되도록 `.bashrc`에 등록합니다
-> - 패키지를 **찾을 수 없다**는 오류(`Unable to locate package`) → 3.5(소스 빌드)
+> - 패키지를 **찾을 수 없다**는 오류(`Unable to locate package`) → `sudo apt update`를 다시 실행해 `Err:`·`E:`로 시작하는 줄이 없는지 확인 → 오류 줄이 있으면 교수에게 알림 · 오류 줄이 없어도 같은 오류가 나면 3.5(소스 빌드)
 > - 설치 중 터미널을 닫으면 패키지가 **일부만 설치된 상태**가 됩니다 — 완료 메시지가 출력될 때까지 터미널을 유지합니다
 
 ### 3.3 렌더링 확인 — GPU 가속인가 소프트웨어 렌더링인가
@@ -313,6 +314,7 @@ echo $TURTLEBOT3_MODEL                                    # burger
 
 ```bash
 mkdir -p ~/turtlebot3_ws/src && cd ~/turtlebot3_ws/src
+git clone -b jazzy https://github.com/ROBOTIS-GIT/DynamixelSDK.git
 git clone -b jazzy https://github.com/ROBOTIS-GIT/turtlebot3_simulations.git
 git clone -b jazzy https://github.com/ROBOTIS-GIT/turtlebot3.git
 git clone -b jazzy https://github.com/ROBOTIS-GIT/turtlebot3_msgs.git
@@ -320,6 +322,7 @@ cd ~/turtlebot3_ws && colcon build --symlink-install
 echo 'source ~/turtlebot3_ws/install/setup.bash' >> ~/.bashrc
 ```
 
+- `DynamixelSDK` = 실물 TurtleBot3의 모터 제어 라이브러리입니다 — `turtlebot3` 저장소의 일부 패키지가 빌드에 이 라이브러리를 요구하므로 함께 받습니다(이 강의 준비에서는 이 빌드를 실행하지 않았습니다 · 확인요망)
 - 빌드에 수 분에서 십수 분이 걸립니다 — 절차는 Day 3 자료 3장의 colcon 빌드와 동일합니다
 - `ros-gz` · `slam_toolbox` · Nav2는 apt 설치를 유지합니다(이 경로는 TurtleBot3 계열만)
 
@@ -441,11 +444,11 @@ ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
 
 | 확인 | 정상 | 아니면 |
 |------|------|------|
-| Gazebo 창 | 육각형 벽 안에 기둥 9개가 배치된 world가 표시됨(첫 실행은 모델 로드로 **수십 초**) | 창이 표시된 뒤 몇 초 만에 사라짐 → 3.3 ①-1 → **이 절을 다시** |
+| Gazebo 창 | 육각형 벽 안에 기둥 9개가 배치된 world가 표시됨(첫 실행은 바닥·조명 모델 다운로드와 로드로 **수십 초** · 인터넷 연결 필요) | 창이 표시된 뒤 몇 초 만에 사라짐 → 3.3 ①-1 → **이 절을 다시** |
 | 로봇 | 기둥 왼쪽에 작은 점으로 보임(로봇 지름 약 14 cm) | 보이지 않음 → 아래 「로봇 찾기」 |
 | 실행 속도 | 화면 오른쪽 아래 **실시간 비율** 표시 — 100%보다 낮을 수 있음 | — |
 
-- 대안 world = `empty_world.launch.py`(빈 공간) · `turtlebot3_house.launch.py`(집 — 첫 실행 시 모델 다운로드로 수 분)
+- 대안 world = `empty_world.launch.py`(빈 공간) · `turtlebot3_house.launch.py`(집 형태의 실내 공간)
 
 **로봇 찾기** — world 전체가 보이면 로봇은 점 하나 크기입니다
 
@@ -454,6 +457,25 @@ ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
 | ① | 왼쪽 Entity Tree에서 `burger` 선택 → 오른쪽 클릭 → **Move to** — 화면이 로봇으로 이동 |
 | ② | 화면이 로봇을 따라 움직이지 않으면 같은 메뉴의 **Follow**가 켜져 있는지 확인하고 해제 |
 | ③ | 위에서 내려다보는 시점이 필요하면 상단 메뉴의 시점 전환(View Angle) 사용 |
+
+**로봇이 넘어졌을 때** — 시뮬레이터를 끄지 않고 세웁니다
+
+| 순서 | 조작 | 확인 | 아니면 |
+|:--:|------|------|------|
+| ① | 정지 명령 1회 — `ros2 topic pub --once /cmd_vel geometry_msgs/msg/TwistStamped "{}"` | 바퀴 회전이 멈춤 | — |
+| ② | 출발 위치에 세운 자세로 옮김(아래 명령) | 로봇이 출발 위치에 똑바로 섬 | ③으로 |
+| ③ | 터미널 1 Ctrl+C → `pgrep -a gz`로 잔존 확인 → 5.1 launch를 **다시** 실행 | world·로봇 정상 표시 | 교수에게 알림 |
+
+```bash
+# ② 출발 위치(-2.0, -0.5)에 세운 자세로 옮김
+gz service -s /world/default/set_pose --reqtype gz.msgs.Pose --reptype gz.msgs.Boolean \
+  --timeout 5000 --req 'name: "burger", position: {x: -2.0, y: -0.5, z: 0.01}, orientation: {w: 1}'
+```
+
+- ①을 먼저 하는 이유 = 구동 플러그인이 마지막 속도 명령을 유지하므로(5.5) 세운 뒤에도 바퀴가 계속 돌기 때문입니다
+- ② 명령은 이 강의 준비에서 실행하지 않았습니다(확인요망) — 세운 뒤에는 `/odom`이 실제 위치와 달라집니다. `/odom`은 바퀴 회전량으로 계산하므로 옮긴 거리를 반영하지 않습니다
+- 세운 뒤의 처리 — SLAM 중이면 6.3 관찰 표 「충돌」 행과 같이 slam_toolbox만 재시작 · Nav2 단계면 7.3 초기 위치를 **다시** 지정
+- ③으로 재기동했으면 시뮬레이션 시각이 0부터 다시 시작하므로 SLAM·Nav2도 다시 기동하고 RViz 왼쪽 아래 **Reset**을 누릅니다
 
 이 launch 하나가 수행하는 작업은 다음과 같습니다. 이는 Day 3 자료 8장에서 다룬 launch의 실제 사례입니다.
 
@@ -468,7 +490,7 @@ ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
 > **자주 하는 실수**
 >
 > - **Gazebo 창을 닫으면 터미널 1의 launch 전체(서버·브리지 포함)가 종료됩니다** — 이 launch는 창과 서버 가운데 하나가 종료되면 전체가 함께 종료되도록 설정되어 있습니다. 창의 처리 부담이 커도 닫지 않습니다(창을 최소화해도 속도는 거의 달라지지 않습니다 — 계산 부하의 대부분이 서버의 LiDAR 처리)
-> - 다른 world를 실행하기 전에는 현재 시뮬레이션을 **완전히 종료**합니다(Ctrl+C 후 `pgrep -a gz`로 잔존 확인). 두 시뮬레이션이 동시에 실행되면 토픽이 뒤섞입니다
+> - 다른 world를 실행하기 전에는 현재 시뮬레이션을 **완전히 종료**합니다(Ctrl+C 후 `pgrep -a gz`로 잔존 확인 → `gz sim` 줄이 남아 있으면 맨 앞 번호로 `kill <번호>`). 두 시뮬레이션이 동시에 실행되면 토픽이 뒤섞입니다
 > - 터미널 1을 닫으면 시뮬레이터가 종료되어 로봇도 제거됩니다 — 터미널 1은 오늘 내내 유지합니다
 
 모델 파일의 존재 확인(2.3) — 파일을 작성하지 않고 위치만 살펴봅니다.
@@ -744,7 +766,7 @@ ros2 launch slam_toolbox online_async_launch.py use_sim_time:=True
 
 | 인자 | 뜻 |
 |------|------|
-| `use_sim_time:=True` | `/clock`(2.4)을 따름 — **필수** |
+| `use_sim_time:=True` | `/clock`(2.4)을 따름 — 이 launch의 기본값도 True이지만 명시함(7.2 Nav2 launch의 기본값은 False) |
 | `slam_params_file:=` | 설정 파일 지정 — 오늘은 기본값 사용 |
 
 기동 확인:
@@ -754,18 +776,29 @@ ros2 node list | grep slam                  # /slam_toolbox
 ros2 topic list | grep map                  # /map 등장
 ```
 
-- `/map`이 목록에 없으면 → 터미널 3의 마지막 출력에서 오류를 확인 → `use_sim_time:=True`를 빠뜨렸으면 Ctrl+C 후 **6.1의 launch 명령을 다시** 실행 · 그래도 없으면 `ros2 topic hz /scan`으로 센서 수신부터 확인
+- `/map`이 목록에 없으면 → 터미널 3의 마지막 출력에서 오류를 확인 → 명령을 잘못 입력했으면 Ctrl+C 후 **6.1의 launch 명령을 다시** 실행 · 그래도 없으면 `ros2 topic hz /scan`으로 센서 수신부터 확인
 
-> **자주 하는 실수 —** `use_sim_time`을 빠뜨리면 노드가 **실제 시각**(시스템 시계)을 사용하므로 그 시각이 `/scan`의 시각(시뮬레이션 시계)과 맞지 않습니다. TF(좌표 변환) 시간 오류가 출력되고 지도가 갱신되지 않습니다. 오늘 실행하는 모든 launch·노드에 `use_sim_time:=True`를 지정합니다.
+> **자주 하는 실수 —** `use_sim_time`의 기본값은 launch마다 다릅니다 — slam_toolbox(`online_async_launch.py`) = True · Nav2(`navigation2.launch.py`) = False. False인 노드는 **실제 시각**(시스템 시계)을 사용하므로 그 시각이 `/scan`의 시각(시뮬레이션 시계)과 맞지 않습니다. 이 경우 TF(좌표 변환) 시간 오류가 출력되고 지도나 위치가 갱신되지 않습니다. 기본값에 기대지 않고 오늘 실행하는 SLAM·Nav2 launch에는 `use_sim_time:=True`를 명시합니다.
 
 ### 6.2 RViz — 지도 표시와 OccupancyGrid 3단계
 
-RViz(터미널 4 · 5.6 유지)에서:
+RViz(터미널 4 · 5.6 유지)를 **위에서 내려다본 지도 화면**으로 바꿉니다. LaserScan만 있으면 지금 LiDAR가 닿은 벽의 점만 보입니다. Map을 추가해야 지금까지 LiDAR가 닿은 범위와 아직 닿지 않은 영역이 함께 보입니다.
 
-| 설정 | 값 |
+| 순서 | 설정 | 확인 |
+|:--:|------|------|
+| ① | Global Options → Fixed Frame = **`map`**(5.6의 `odom`에서 교체) | Global Status에 오류 없음 |
+| ② | Add → By topic → `/map` → **Map** | 격자 지도가 표시됨 — Add 직후 최대 약 5초 뒤(지도 발행 간격 5초) |
+| ③ | 오른쪽 **Views** 패널 → Type = **TopDownOrtho** → **Zero** | 지도를 위에서 내려다본 평면 화면 |
+| ④ | LaserScan(5.6)은 그대로 둠 | 지도 위에 현재 스캔 점이 함께 표시됨 |
+
+| 지도 색 | 뜻 |
 |------|------|
-| Fixed Frame | **`map`**(5.6의 `odom`에서 교체) |
-| Add → By topic → `/map` | Map — 격자 지도 표시 |
+| 흰색 | LiDAR 빔이 지나간 빈 공간 — **관측된 범위** |
+| 검정 | 벽·기둥(점유) |
+| 회색 | 아직 관측되지 않은 영역(미지) |
+
+- 스캔 점만 보이고 흰색·회색 격자가 보이지 않으면 → Displays 목록에 Map이 있고 Topic이 `/map`인지 확인 → 없으면 **②를 다시** · Map이 있어도 비어 있으면 ①의 Fixed Frame이 `map`인지 확인 → 그래도 비어 있으면 6.1 기동 확인(`/map` 등장)부터 **다시**
+- 기본 시점(Orbit)에서는 지도가 비스듬히 보여 회색 영역을 놓치기 쉽습니다 — 오늘 매핑은 TopDownOrtho 시점으로 진행합니다. 로봇이 화면 밖으로 벗어나면 Views 패널의 **Zero**를 다시 누릅니다
 
 - 프레임 트리에 `map`이 추가되었습니다 — `ros2 run tf2_tools view_frames` 재실행 → `map → odom → base_footprint …`(5.4와 대조)
 
@@ -804,6 +837,18 @@ ros2 topic echo /map --once | head -20               # ③ info까지만 — dat
 ros2 run turtlebot3_teleop teleop_keyboard
 ```
 
+**RViz로 지도를 확인하며 주행** — 이 강의 준비의 매핑과 같은 조건입니다. 화면은 6.2의 위에서 내려다본 지도(TopDownOrtho)를 사용합니다.
+
+| 확인 | 화면 | 조치 |
+|------|------|------|
+| 관측된 범위 | 흰색 영역이 로봇 주변에서 넓어짐 | — |
+| 미관측 영역 | 벽 안쪽에 남은 회색 칸 | 그쪽으로 로봇을 이동해 관측 → 아래 **③을 다시** |
+| 현재 스캔 | 스캔 점이 검은 벽 위에 겹침 | 어긋나면 아래 관찰 표 「충돌」 행 |
+| 마치는 기준 | 벽 안쪽에 회색 칸이 없음 + 출발점 복귀 | 6.4 저장으로 진행 |
+
+- 벽 바깥의 회색은 LiDAR가 닿을 수 없는 영역이므로 확인 대상이 아닙니다 — 벽 **안쪽**의 회색만 확인합니다
+- teleop 키를 누른 뒤에는 Gazebo 창이 아니라 RViz에서 로봇 위치와 스캔 점의 변화를 확인합니다
+
 | 순서 | 동작 |
 |:--:|------|
 | ① | 천천히 전진(0.1 m/s 이하) — RViz에서 회색(미지)이 흰색·검정으로 바뀌는 것을 관찰 |
@@ -815,7 +860,7 @@ ros2 run turtlebot3_teleop teleop_keyboard
 | 관찰 | 뜻 |
 |------|------|
 | 지도가 순간적으로 정렬됨 | `map→odom` 보정(4.3) — 정상 |
-| 빨간 현재 스캔이 검은 벽과 어긋남 · 지도 전체가 회전 | 벽·기둥 **충돌** → 바퀴 미끄러짐 → odom 방향 오차(4.3 그림) → 터미널 3 slam_toolbox만 재시작 → **①부터 다시** |
+| 빨간 현재 스캔이 검은 벽과 어긋남 · 지도 전체가 회전 | 벽·기둥 **충돌** → 바퀴 미끄러짐 → odom 방향 오차(4.3 그림) → 터미널 3 slam_toolbox만 재시작 → RViz 왼쪽 아래 **Reset** → **①부터 다시** |
 | 벽이 이중으로 표시 | 급회전·급가속으로 오도메트리 오차 누적 → 천천히 |
 | 회색 잔존 | 미관측 영역 — 이동해 관측 |
 
@@ -912,14 +957,16 @@ free_thresh: 0.196
 
 ### 6.8 응용 실습 — `use_sim_time` 누락 증상 확인
 
-- slam_toolbox를 종료하고 `use_sim_time:=True` **없이** 다시 기동합니다
+- slam_toolbox를 종료하고 `use_sim_time:=False`를 **지정해** 다시 기동합니다 — 인자를 빼기만 하면 이 launch의 기본값(True)이 적용되어 증상이 나타나지 않습니다(6.1 콜아웃)
 - RViz에서 지도가 갱신되는지, 터미널 3에 어떤 메시지가 출력되는지 기록합니다
 - 기록한 증상만 보고 원인을 설명한 뒤 올바른 명령으로 다시 기동해 지도가 갱신되는지 확인합니다
 
 <details>
 <summary>실습 정리</summary>
 
-- `use_sim_time`이 없으면 slam_toolbox는 **실제 시각**을 사용합니다. `/scan`에는 **시뮬레이션 시각**이 기록되어 있습니다 — 두 시각이 맞지 않아 좌표 변환 시간 오류가 출력되고 지도가 갱신되지 않습니다(6.1 콜아웃)
+- 이 실습의 증상은 이 강의 준비에서 실측하지 않았습니다(확인요망) — 실제로 출력된 메시지를 기록해 아래 설명과 대조합니다
+
+- `use_sim_time:=False`이면 slam_toolbox는 **실제 시각**을 사용합니다. `/scan`에는 **시뮬레이션 시각**이 기록되어 있습니다 — 두 시각이 맞지 않아 좌표 변환 시간 오류가 출력되고 지도가 갱신되지 않습니다(6.1 콜아웃)
 
 - 증상이 노드 이름이 아니라 **시간 오류**로 나타난다는 점이 진단의 단서입니다
 
@@ -1002,8 +1049,14 @@ ros2 launch turtlebot3_navigation2 navigation2.launch.py use_sim_time:=True map:
 ros2 node list          # /amcl · /planner_server · /controller_server · /bt_navigator …
 ```
 
-- 목록에 Nav2 노드가 출력되지 않아도 RViz에 지도가 표시되면 기동된 상태일 수 있습니다 — 몇 초 뒤 `node list`를 **다시** 실행합니다(첫 조회의 탐색 지연 · 5.2와 같은 현상)
-- 지도가 표시되지 않으면 → 터미널 3의 첫 오류를 확인 → `map:=` 경로(`$HOME/map.yaml`)와 `use_sim_time:=True`를 고쳐 **7.2의 launch 명령을 다시** 실행
+| 확인 | 정상 | 아니면 |
+|------|------|------|
+| RViz 지도 | 6.4에서 저장한 지도가 표시됨 — Add 조작 불필요 | 터미널 3의 첫 오류 확인 → `map:=` 경로(`$HOME/map.yaml`)·`use_sim_time:=True`를 고쳐 **7.2의 launch 명령을 다시** 실행 |
+| 로봇·LiDAR 점 | 아직 표시되지 않음 — 7.3 초기 위치 지정 뒤 표시 | — |
+| 노드 목록 | Nav2 노드 출력 | 몇 초 뒤 `node list`를 **다시** 실행(첫 조회의 탐색 지연 · 5.2와 같은 현상) |
+
+- 저장한 지도가 RViz에 표시되는 경로 = `map:=` → map_server가 `map.yaml`·`map.pgm`을 읽어 `/map` 발행 → Nav2용 RViz 설정에 미리 들어 있는 Map 표시가 수신합니다. 이 RViz는 처음부터 위에서 내려다본 시점(TopDownOrtho)입니다
+- 초기 위치 지정 전의 화면(지도만 표시)은 이 강의 준비에서 화면으로 확인하지 않았습니다(확인요망) — AMCL은 초기 위치를 받기 전에 `map→odom` 변환을 발행하지 않습니다(`burger.yaml`의 `set_initial_pose: false`)
 
 ### 7.3 초기 위치 — 2D Pose Estimate
 
@@ -1720,11 +1773,14 @@ ros2 launch turtlebot3_cartographer cartographer.launch.py use_sim_time:=True
 지도 없이 Nav2를 기동하고 slam_toolbox를 함께 실행합니다. 목표를 지정할 때마다 **로봇이 미지 영역으로 주행하므로 지도가 확장됩니다**(Nav2 공식 튜토리얼 방식).
 
 ```bash
-ros2 launch nav2_bringup navigation_launch.py use_sim_time:=True
+ros2 launch nav2_bringup navigation_launch.py use_sim_time:=True \
+  params_file:=$(ros2 pkg prefix turtlebot3_navigation2)/share/turtlebot3_navigation2/param/burger.yaml
 ros2 launch slam_toolbox online_async_launch.py use_sim_time:=True
-ros2 launch nav2_bringup rviz_launch.py
+ros2 launch nav2_bringup rviz_launch.py use_sim_time:=True
 ```
 
+- `params_file` = burger용 설정 — `nav2_bringup`의 기본 설정(`nav2_params.yaml`)은 `/cmd_vel`을 `Twist`로 발행하므로 로봇이 움직이지 않습니다(5.5 타입 불일치). 기본 설정의 로봇 반경도 0.22 m로 burger(0.1 m)보다 큽니다
+- 위 조합은 이 강의 준비에서 실행하지 않았습니다(확인요망)
 - `turtlebot3_navigation2`의 launch(AMCL·map_server 포함)와는 **동시 실행 금지** — `map→odom`을 AMCL과 slam_toolbox가 함께 발행하므로 충돌합니다(7.2)
 - 미지 영역의 경계(frontier)에 목표를 자동으로 지정하면 **자율 탐사**가 됩니다 — 이 교육과정의 범위 밖에 있는 다음 단계
 
