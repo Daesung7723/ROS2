@@ -607,6 +607,10 @@ if self.get_parameter('flip').value:
 - 이 그림이 `rqt_graph`에 그대로 나타나야 합니다(5.3에서 확인)
 - **점선이나 끊긴 화살표가 표시되면** 토픽 이름이 어긋난 것
 
+**움직이는 그림 M8-1 — 손모양 명령의 전달 흐름(3.3)** (약 10.7초 자동 반복)
+
+![모션 M8-1](../images/Day08/M8-1_flow.svg)
+
 ### 3.4 확인 활동 — 개념 점검
 
 코드를 작성하기 전에 구두로 확인합니다.
@@ -642,6 +646,10 @@ if self.get_parameter('flip').value:
 ![그림 S1](../images/Day08/S1_decision_maker_states.svg)
 
 - `RESUME` 상태를 두는 이유 = 손을 내린 직후 급출발을 막는 것 · 실제 차량의 정지 후 재출발과 같은 취지
+
+**움직이는 그림 M8-2 — `decision_maker`의 상태 전이(4.1 · 4.3 실측 시각)** (약 19초 자동 반복)
+
+![모션 M8-2](../images/Day08/M8-2_state.svg)
 
 ### 4.2 코드 작성 — 4단계
 
@@ -1250,6 +1258,10 @@ self.timeout_warned = False
 | **합계** | **약 0.5\~0.75초** | 5.2 관찰값 0.6초와 부합 |
 
 ![그림 F2](../images/Day08/F2_delay_stack.svg)
+
+**움직이는 그림 M8-3 — 반응 지연의 구간 누적(6.2)** (약 15.5초 자동 반복)
+
+![모션 M8-3](../images/Day08/M8-3_delay.svg)
 
 **측정 방법 ① — rqt_plot** (Day 2 자료 7.6):
 
