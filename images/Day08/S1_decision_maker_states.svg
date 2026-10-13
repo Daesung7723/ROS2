@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="356" viewBox="0 0 600 356" font-family="Malgun Gothic, 'Noto Sans KR', sans-serif">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1F2937"/></marker><marker id="ahc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#C0392B"/></marker></defs>
+<rect x="0" y="0" width="600" height="356" fill="#FFFFFF"/>
+<g transform="translate(0,0)">
+<path d="M156.0,158.0 L383.0,82.3" fill="none" stroke="#1F2937" stroke-width="1.8" marker-end="url(#ah)"/>
+<path d="M405.9,105.3 Q380.0,170.0 405.5,233.8" fill="none" stroke="#1F2937" stroke-width="1.8" marker-end="url(#ah)"/>
+<path d="M434.1,234.7 Q460.0,170.0 434.5,106.2" fill="none" stroke="#1F2937" stroke-width="1.8" marker-end="url(#ah)"/>
+<path d="M384.0,258.0 L157.0,182.3" fill="none" stroke="#1F2937" stroke-width="1.8" marker-end="url(#ah)"/>
+<circle cx="120" cy="170" r="38" fill="#FFFFFF" stroke="#1F2937" stroke-width="2"/>
+<text x="120" y="168" text-anchor="middle" font-size="16" font-weight="bold" fill="#1F2937">DRIVE</text>
+<text x="120" y="185" text-anchor="middle" font-size="12" fill="#1F5FBF">전진</text>
+<circle cx="420" cy="70" r="38" fill="#F6D5D3" stroke="#C0392B" stroke-width="2"/>
+<text x="420" y="68" text-anchor="middle" font-size="16" font-weight="bold" fill="#1F2937">STOP</text>
+<text x="420" y="85" text-anchor="middle" font-size="12" fill="#1F5FBF">정지</text>
+<circle cx="420" cy="270" r="38" fill="#FFFFFF" stroke="#1F2937" stroke-width="2"/>
+<text x="420" y="268" text-anchor="middle" font-size="16" font-weight="bold" fill="#1F2937">RESUME</text>
+<text x="420" y="285" text-anchor="middle" font-size="12" fill="#1F5FBF">대기</text>
+<rect x="232.0" y="94.9" width="65.4" height="19" rx="3" fill="#FFFFFF" opacity="0.92"/>
+<text x="264.7" y="109.9" text-anchor="middle" font-size="14" fill="#1F2937">stop 수신</text>
+<rect x="346.2" y="159.8" width="65.4" height="19" rx="3" fill="#FFFFFF" opacity="0.92"/>
+<text x="378.9" y="174.8" text-anchor="middle" font-size="14" fill="#1F2937">none 수신</text>
+<rect x="424.3" y="160.2" width="73.6" height="19" rx="3" fill="#FFFFFF" opacity="0.92"/>
+<text x="461.1" y="175.2" text-anchor="middle" font-size="14" fill="#1F2937">stop 재수신</text>
+<rect x="199.7" y="225.3" width="131.0" height="19" rx="3" fill="#FFFFFF" opacity="0.92"/>
+<text x="265.2" y="240.3" text-anchor="middle" font-size="14" fill="#1F2937">resume_delay 경과</text>
+<path d="M40,170 L80,170" fill="none" stroke="#1F2937" stroke-width="1.8" marker-end="url(#ah)"/><text x="40" y="160" text-anchor="middle" font-size="12" fill="#4B5563">시작</text>
+</g>
+<text x="10" y="348" font-size="12.5" fill="#4B5563">상태는 0.1초마다 결정 — 같은 입력이라도 직전 상태에 따라 다음 상태가 다르다</text>
+</svg>
